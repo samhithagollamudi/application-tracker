@@ -6,6 +6,7 @@ import (
 	"github.com/ChandraShekar2001/application-tracker/internal/applications"
 	"github.com/ChandraShekar2001/application-tracker/internal/auth"
 	"github.com/ChandraShekar2001/application-tracker/internal/catalog"
+	"github.com/ChandraShekar2001/application-tracker/internal/export"
 	"github.com/ChandraShekar2001/application-tracker/internal/users"
 )
 
@@ -14,6 +15,7 @@ func registerAdmin(app *http.ServeMux, am *auth.Manager, d Deps, cat *catalog.Se
 	a := func(f http.HandlerFunc) http.Handler { return admin(f) }
 
 	app.Handle("GET /applications", a(ah.AdminList))
+	app.Handle("GET /applications/export.csv", a((&export.Handler{Pool: d.Pool, Log: d.Log}).CSV))
 
 	ch := &catalog.AdminHandlers{Svc: cat, Auth: am}
 	app.Handle("GET /admin/catalog", a(ch.Page))

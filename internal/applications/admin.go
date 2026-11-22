@@ -73,6 +73,12 @@ func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
+// FromSQL and Where are exported for the CSV export, which must select
+// exactly the rows the admin view shows.
+const FromSQL = fromSQL
+
+func Where(scope access.Scope, f Filter, args *access.Args) string { return where(scope, f, args) }
+
 // fromSQL joins applications (a) to students (s), universities (u),
 // branches (b), consultancies (c) and owners (o).
 const fromSQL = ` FROM applications a
