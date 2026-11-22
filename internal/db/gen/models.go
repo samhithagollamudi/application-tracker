@@ -103,4 +103,5 @@ type User struct {
 	PasswordHash string
 	Active       bool
 	CreatedAt    pgtype.Timestamptz
+	AuthVersion  int32
 }

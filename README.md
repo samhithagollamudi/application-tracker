@@ -29,9 +29,8 @@ server migrate    apply migrations and exit
 | Variable | Required | Notes |
 |---|---|---|
 | `DATABASE_URL` | yes | Postgres connection string |
-| `SESSION_KEY` | production | 64 hex chars: `openssl rand -hex 32` |
 | `PORT` | no | default 8080 |
-| `APP_ENV` | no | `development` (default) or `production` |
+| `APP_ENV` | no | `development` (default) or `production` (secure cookies, HSTS, trusts `X-Forwarded-For`) |
 
 ## Layout
 

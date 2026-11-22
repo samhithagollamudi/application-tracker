@@ -1,32 +1,36 @@
 // Command server runs the SNY Cosmos application tracker.
 //
-//	server            start the HTTP server (runs migrations first)
-//	server migrate    apply migrations and exit
+//	server                                         migrate, then serve HTTP
+//	server migrate                                 apply migrations and exit
+//	server create-admin --email E --name "N"       create an admin; prints a generated password once
 package main
 
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/mail"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ChandraShekar2001/application-tracker/internal/auth"
 	"github.com/ChandraShekar2001/application-tracker/internal/config"
 	"github.com/ChandraShekar2001/application-tracker/internal/db"
 	"github.com/ChandraShekar2001/application-tracker/internal/db/gen"
-	"github.com/ChandraShekar2001/application-tracker/internal/httpx"
-	"github.com/ChandraShekar2001/application-tracker/internal/web/pages"
-	"github.com/ChandraShekar2001/application-tracker/internal/web/static"
+	"github.com/ChandraShekar2001/application-tracker/internal/server"
 )
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(log)
 	if err := run(log, os.Args[1:]); err != nil {
 		log.Error("fatal", "err", err)
 		os.Exit(1)
@@ -53,7 +57,7 @@ func run(log *slog.Logger, args []string) error {
 
 	cmd := "serve"
 	if len(args) > 0 {
-		cmd = args[0]
+		cmd, args = args[0], args[1:]
 	}
 	switch cmd {
 	case "serve":
@@ -61,59 +65,45 @@ func run(log *slog.Logger, args []string) error {
 	case "migrate":
 		log.Info("migrations up to date")
 		return nil
+	case "create-admin":
+		return createAdmin(ctx, pool, args)
 	default:
-		return fmt.Errorf("unknown command %q (want: serve, migrate)", cmd)
+		return fmt.Errorf("unknown command %q (want: serve, migrate, create-admin)", cmd)
 	}
 }
 
+func createAdmin(ctx context.Context, pool *pgxpool.Pool, args []string) error {
+	fs := flag.NewFlagSet("create-admin", flag.ContinueOnError)
+	email := fs.String("email", "", "admin user ID (email)")
+	name := fs.String("name", "Admin", "display name")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	e := strings.TrimSpace(*email)
+	if a, err := mail.ParseAddress(e); err != nil || a.Address != e {
+		return errors.New("--email must be a plain email address")
+	}
+	pw := auth.GeneratePassword()
+	hash, err := auth.HashPassword(pw)
+	if err != nil {
+		return err
+	}
+	if _, err := gen.New(pool).CreateUser(ctx, gen.CreateUserParams{
+		Name: strings.TrimSpace(*name), Email: e, Role: "admin", PasswordHash: hash,
+	}); err != nil {
+		return fmt.Errorf("create admin: %w", err)
+	}
+	fmt.Printf("\nAdmin created.\n  User ID:  %s\n  Password: %s\n\nCopy the password now; it is not stored anywhere in plain text.\n\n", e, pw)
+	return nil
+}
+
 func serve(ctx context.Context, log *slog.Logger, cfg config.Config, pool *pgxpool.Pool) error {
-	q := gen.New(pool)
-	mux := http.NewServeMux()
-
-	mux.Handle("GET /static/", http.StripPrefix("/static/", static.Handler()))
-
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		c, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		if err := pool.Ping(c); err != nil {
-			http.Error(w, "db unavailable", http.StatusServiceUnavailable)
-			return
-		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte("ok"))
-	})
-
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		rows, err := q.ListBranches(r.Context())
-		if err != nil {
-			log.Error("list branches", "id", httpx.RequestID(r.Context()), "err", err)
-			renderError(w, r, http.StatusInternalServerError)
-			return
-		}
-		names := make([]string, len(rows))
-		for i, b := range rows {
-			names[i] = b.Name
-		}
-		_ = pages.Home(names).Render(r.Context(), w)
-	})
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		renderError(w, r, http.StatusNotFound)
-	})
-
-	handler := httpx.Chain(mux,
-		httpx.WithRequestID,
-		httpx.Logger(log),
-		httpx.Recover(log),
-		httpx.SecurityHeaders(cfg.IsProd()),
-	)
-
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           handler,
+		Handler:           server.New(server.Deps{Cfg: cfg, Pool: pool, Log: log}),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second, // CSV export streams; revisit in milestone 7
+		WriteTimeout:      5 * time.Minute, // CSV export streams large files
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 16,
 	}
@@ -136,14 +126,4 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config, pool *pgxpo
 		defer cancel()
 		return srv.Shutdown(shutCtx)
 	}
-}
-
-func renderError(w http.ResponseWriter, r *http.Request, status int) {
-	title, msg := "Something went wrong", "Please try again. If it keeps happening, contact the admin."
-	if status == http.StatusNotFound {
-		title, msg = "Page not found", "The page you asked for doesn't exist, or you don't have access to it."
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
-	_ = pages.Error(status, title, msg).Render(r.Context(), w)
 }

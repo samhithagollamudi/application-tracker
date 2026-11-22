@@ -1,32 +1,49 @@
 package layout
 
-// NavItem is one entry in the sidebar.
+import (
+	"github.com/ChandraShekar2001/application-tracker/internal/model"
+	"github.com/ChandraShekar2001/application-tracker/internal/reqctx"
+)
+
 type NavItem struct {
 	Key   string
 	Label string
 	Href  string
 }
 
-// Shell describes the signed-in chrome around a page. A nil *Shell renders a bare page (e.g. login).
-type Shell struct {
-	RoleLabel string // e.g. "Consultant · Chennai"
-	RoleClass string // "role-consultant" (purple) or "role-other" (blue)
-	UserName  string
-	UserEmail string
-	Items     []NavItem
-	Active    string // NavItem.Key that is highlighted
-	CSRFToken string
+func navItems(u *model.User) []NavItem {
+	if u.IsAdmin() {
+		return []NavItem{
+			{"applications", "Applications", "/applications"},
+			{"students", "Students", "/students"},
+			{"catalog", "Universities & consultancies", "/admin/catalog"},
+			{"users", "Users & branches", "/admin/users"},
+		}
+	}
+	label := "Students"
+	if u.Role == model.RoleConsultant {
+		label = "My students"
+	}
+	return []NavItem{
+		{"students", label, "/students"},
+		{"new", "New student", "/students/new"},
+	}
 }
 
-templ Base(title string, csrf string) {
+func roleClass(u *model.User) string {
+	if u.Role == model.RoleConsultant {
+		return "role-consultant"
+	}
+	return "role-other"
+}
+
+templ Base(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			if csrf != "" {
-				<meta name="csrf-token" content={ csrf }/>
-			}
+			<meta name="csrf-token" content={ reqctx.CSRF(ctx) }/>
 			<title>{ title } · SNY Cosmos Tracker</title>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"/>
@@ -36,24 +53,30 @@ templ Base(title string, csrf string) {
 		</head>
 		<body>
 			{ children... }
+			if f := reqctx.Flash(ctx); f != "" {
+				<div class="toast" role="status" data-toast>{ f }</div>
+			}
 		</body>
 	</html>
 }
 
-templ Page(title string, s *Shell) {
-	if s == nil {
-		@Base(title, "") {
-			{ children... }
-		}
-	} else {
-		@Base(title, s.CSRFToken) {
+// CSRF is the hidden field every POST form must include.
+templ CSRF() {
+	<input type="hidden" name="csrf_token" value={ reqctx.CSRF(ctx) }/>
+}
+
+// Page renders the signed-in shell (sidebar + main) around the content.
+// active is the NavItem key to highlight.
+templ Page(title string, active string) {
+	@Base(title) {
+		if u := reqctx.User(ctx); u != nil {
 			<div class="shell">
 				<aside class="side">
-					<img class="logo-img" src="/static/logo.png" alt="SNY Cosmos Overseas"/>
-					<div class={ "role", s.RoleClass }>{ s.RoleLabel }</div>
+					<a href="/"><img class="logo-img" src="/static/logo.png" alt="SNY Cosmos Overseas"/></a>
+					<div class={ "role", roleClass(u) }>{ u.RoleLabel() }</div>
 					<nav class="nav" aria-label="Main">
-						for _, it := range s.Items {
-							if it.Key == s.Active {
+						for _, it := range navItems(u) {
+							if it.Key == active {
 								<a href={ templ.SafeURL(it.Href) } class="on" aria-current="page">{ it.Label }</a>
 							} else {
 								<a href={ templ.SafeURL(it.Href) }>{ it.Label }</a>
@@ -61,10 +84,10 @@ templ Page(title string, s *Shell) {
 						}
 					</nav>
 					<div class="me">
-						<strong>{ s.UserName }</strong>
-						<span>{ s.UserEmail }</span>
+						<strong>{ u.Name }</strong>
+						<span>{ u.Email }</span>
 						<form method="post" action="/logout" style="margin-top:8px">
-							<input type="hidden" name="csrf_token" value={ s.CSRFToken }/>
+							@CSRF()
 							<button class="lnk" type="submit">Sign out</button>
 						</form>
 					</div>
@@ -73,6 +96,10 @@ templ Page(title string, s *Shell) {
 					{ children... }
 				</main>
 			</div>
+		} else {
+			<main style="max-width:560px;margin:80px auto;padding:0 16px">
+				{ children... }
+			</main>
 		}
 	}
 }

@@ -2,7 +2,6 @@
 package config
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -11,15 +10,14 @@ import (
 
 type Config struct {
 	DatabaseURL string
-	SessionKey  []byte // 32 bytes; signs/derives session and CSRF secrets
 	Port        int
 	Env         string // "development" or "production"
 }
 
 func (c Config) IsProd() bool { return c.Env == "production" }
 
-// Load parses the environment. DATABASE_URL is always required; SESSION_KEY
-// is required in production (a random one is generated in development).
+// Load parses the environment. Only DATABASE_URL is required. Sessions live
+// server-side in Postgres, so no signing key is needed.
 func Load() (Config, error) {
 	c := Config{
 		DatabaseURL: os.Getenv("DATABASE_URL"),
@@ -38,15 +36,6 @@ func Load() (Config, error) {
 			return c, fmt.Errorf("PORT must be a valid port number, got %q", p)
 		}
 		c.Port = n
-	}
-	if k := os.Getenv("SESSION_KEY"); k != "" {
-		b, err := hex.DecodeString(k)
-		if err != nil || len(b) != 32 {
-			return c, errors.New("SESSION_KEY must be 64 hex characters (32 bytes); generate with: openssl rand -hex 32")
-		}
-		c.SessionKey = b
-	} else if c.IsProd() {
-		return c, errors.New("SESSION_KEY is required in production")
 	}
 	return c, nil
 }
