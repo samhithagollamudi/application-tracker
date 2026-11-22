@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "server",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DATABASE_URL=postgres://sny:sny@localhost:5433/sny_tracker?sslmode=disable",
+        "PORT=8090",
+        "APP_ENV=development",
+        "go", "run", "./cmd/server"
+      ],
+      "port": 8090
+    }
+  ]
+}

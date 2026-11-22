@@ -1,0 +1,40 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sny
+          POSTGRES_PASSWORD: sny
+          POSTGRES_DB: sny_tracker
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sny -d sny_tracker"
+          --health-interval 2s --health-retries 20
+    env:
+      DATABASE_URL: postgres://sny:sny@localhost:5432/sny_tracker?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Generated code is up to date
+        run: |
+          go install github.com/a-h/templ/cmd/templ@v0.3.1118
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          sqlc generate && templ generate
+          git diff --exit-code
+      - run: go vet ./...
+      - uses: dominikh/staticcheck-action@v1
+        with:
+          install-go: false
+      - run: go test -race ./...
+      - name: Migrations apply
+        run: go run ./cmd/server migrate
