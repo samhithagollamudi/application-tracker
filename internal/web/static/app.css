@@ -111,3 +111,6 @@ a.rowlink{color:var(--b);font-weight:700;text-decoration:none}
 .savebar{position:sticky;bottom:0;flex-direction:row;justify-content:flex-end;flex-wrap:wrap;padding:14px 18px}
 .inline{display:inline}
 .htmx-request.tbl,.htmx-request .tbl{opacity:.6;transition:opacity .2s}
+.tabs a.tab{display:inline-flex;align-items:center;height:42px;padding:0 2px;font-weight:600;color:var(--mu);border-bottom:3px solid transparent;text-decoration:none}
+.tabs a.tab.on{color:var(--p);border-bottom-color:var(--p)}
+.c-blue{color:#283593}.c-green{color:#1E6B34}.c-purple{color:#6e2570}

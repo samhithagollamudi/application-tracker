@@ -101,3 +101,19 @@ document.addEventListener('click', (e) => {
   const tr = e.target.closest('tr[data-href]');
   if (tr && !e.target.closest('a,button,input,select,label')) location.href = tr.dataset.href;
 });
+
+// Copy-to-clipboard buttons (generated passwords).
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-copy]');
+  if (!b) return;
+  const done = () => { const t = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = t; }, 1500); };
+  if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).then(done, () => alert('Copy blocked. Select the password and copy it.'));
+});
+
+// Create-user form: branch only for consultants.
+document.addEventListener('change', (e) => {
+  if (!e.target.matches('[data-role-select]')) return;
+  const f = e.target.closest('form');
+  f.querySelector('[data-branch-field]').hidden = e.target.value !== 'consultant';
+  f.querySelector('[data-network-hint]').hidden = e.target.value !== 'agent_network';
+});

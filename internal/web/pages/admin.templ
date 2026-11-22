@@ -1,0 +1,366 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/ChandraShekar2001/application-tracker/internal/model"
+	"github.com/ChandraShekar2001/application-tracker/internal/web/components"
+	"github.com/ChandraShekar2001/application-tracker/internal/web/layout"
+)
+
+var sourceOptions = []model.Option{{Value: "internal", Label: "Internal (branch consultants)"}, {Value: "b2b", Label: "B2B (agent network)"}}
+
+templ Applications(vm ApplicationsVM) {
+	@layout.Page("Applications", "applications") {
+		<div class="head">
+			<div>
+				<h1>Applications</h1>
+				<p class="sub">Every application across all branches, internal and B2B.</p>
+			</div>
+		</div>
+		<form
+			class="filters"
+			method="get"
+			action="/applications"
+			hx-get="/applications"
+			hx-target="#results"
+			hx-select="#results"
+			hx-swap="outerHTML"
+			hx-push-url="true"
+			hx-trigger="change, input changed delay:300ms from:#q"
+		>
+			<label class="f span2">
+				Search
+				<input id="q" name="q" type="search" value={ vm.F.Q } placeholder="Student, email, IDs, application no. or university"/>
+			</label>
+			@components.FilterSelect("Branch", "branch", vm.F.Branch, "All branches", vm.Branches)
+			@components.FilterSelect("Country", "country", vm.F.Country, "Any country", vm.Countries)
+			@components.FilterSelect("University", "university", vm.F.University, "Any university", vm.Universities)
+			@components.FilterSelect("Status", "status", vm.F.Status, "Any status", model.Statuses)
+			@components.FilterSelect("Intake", "intake", vm.F.Intake, "Any intake", vm.Intakes)
+			@components.FilterSelect("Programme level", "level", vm.F.Level, "Any level", model.Levels)
+			@components.FilterSelect("Source", "source", vm.F.Source, "Internal + B2B", sourceOptions)
+			@components.FilterSelect("Consultancy", "consultancy", vm.F.Consultancy, "Any consultancy",
+				append([]model.Option{{Value: "none", Label: "Internal only (no consultancy)"}}, vm.Consultancies...))
+			<label class="f">Created from<input type="date" name="from" value={ vm.F.From }/></label>
+			<label class="f">Created to<input type="date" name="to" value={ vm.F.To }/></label>
+			<noscript><button class="btn" type="submit">Apply filters</button></noscript>
+		</form>
+		@applicationResults(vm)
+	}
+}
+
+templ stat(label string, n int, color string) {
+	<div class="stat">
+		<span>{ label }</span>
+		<strong class={ color }>{ strconv.Itoa(n) }</strong>
+	</div>
+}
+
+templ applicationResults(vm ApplicationsVM) {
+	<div id="results" style="display:flex;flex-direction:column;gap:20px">
+		<div class="row" style="justify-content:space-between">
+			<div class="row">
+				if n := vm.F.Active(); n > 0 {
+					<span class="small muted b">{ plural(n, "filter", "filters") } on</span>
+					<a class="lnk" href="/applications">Clear all</a>
+				}
+			</div>
+			<a class="btn pri" href={ templ.SafeURL(vm.ExportHref) } download>Export CSV ({ strconv.Itoa(vm.Stats.Total) })</a>
+		</div>
+		<div class="stats">
+			@stat("Applications (filtered)", vm.Stats.Total, "")
+			@stat("Applied, awaiting decision", vm.Stats.Waiting, "c-blue")
+			@stat("Admitted or further", vm.Stats.Admitted, "c-green")
+			@stat("From consultancies (B2B)", vm.Stats.B2B, "c-purple")
+		</div>
+		<div class="tbl">
+			<div class="scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>App ID</th><th>Student</th><th>University</th><th>Country</th><th>Programme</th><th>Intake</th>
+							<th>Branch</th><th>Consultancy</th><th>Owner</th><th>Status</th><th>Updated</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, a := range vm.Rows {
+							<tr class="click" data-href={ studentFromApps(a.StudentID) }>
+								<td class="muted b">{ a.Code() }</td>
+								<td>
+									<a class="rowlink" href={ templ.SafeURL(studentFromApps(a.StudentID)) }>{ a.StudentName() }</a>
+									<div class="small muted">{ a.Email }</div>
+								</td>
+								<td class="b">
+									{ a.Uni }
+									if a.Custom {
+										<span class="badge b-other">One-off</span>
+									}
+								</td>
+								<td>
+									@components.Dash(a.Country)
+								</td>
+								<td>
+									<div>
+										@components.Dash(a.Programme)
+									</div>
+									<div class="small muted">{ model.LevelLabel(a.Level) }</div>
+								</td>
+								<td>{ model.IntakeLabel(a.Intake) } { a.Year }</td>
+								<td>
+									@components.Dash(a.BranchName)
+								</td>
+								<td>
+									@components.Dash(a.ConsultancyName)
+								</td>
+								<td class="muted">{ a.OwnerName }</td>
+								<td>
+									@components.StatusBadge(a.Status)
+								</td>
+								<td class="muted">{ model.FormatDate(a.UpdatedAt) }</td>
+							</tr>
+						}
+						if len(vm.Rows) == 0 {
+							<tr><td colspan="11" class="muted" style="padding:28px;text-align:center">No applications match these filters.</td></tr>
+						}
+					</tbody>
+				</table>
+			</div>
+			<div class="small muted" style="padding:12px 14px">
+				{ plural(vm.Stats.Total, "application", "applications") }
+				if vm.Stats.Total > len(vm.Rows) {
+					· showing the { strconv.Itoa(len(vm.Rows)) } most recently updated. The CSV export includes all of them.
+				}
+			</div>
+		</div>
+	</div>
+}
+
+func addedBy(r CatalogRow) string {
+	if r.AddedBy == "" {
+		return "Admin"
+	}
+	return "Other · " + r.AddedBy
+}
+
+func addedByClass(r CatalogRow) string {
+	if r.AddedBy == "" {
+		return "badge b-admin"
+	}
+	return "badge b-other"
+}
+
+templ Catalog(vm CatalogVM) {
+	@layout.Page("Universities & consultancies", "catalog") {
+		<div class="head">
+			<div>
+				<h1>Universities &amp; consultancies</h1>
+				<p class="sub">These are the lists consultants and the agent network see in their dropdowns. Consultancies the agent network types under “Other” are added here and marked. Universities typed under “Other” stay on that one application only.</p>
+			</div>
+		</div>
+		<div class="tabs" role="tablist">
+			<a role="tab" class={ "tab", templ.KV("on", vm.Tab == "universities") } aria-selected={ strconv.FormatBool(vm.Tab == "universities") } href="/admin/catalog">Universities ({ strconv.Itoa(len(vm.Universities)) })</a>
+			<a role="tab" class={ "tab", templ.KV("on", vm.Tab == "consultancies") } aria-selected={ strconv.FormatBool(vm.Tab == "consultancies") } href="/admin/catalog?tab=consultancies">External consultancies ({ strconv.Itoa(len(vm.Consultancies)) })</a>
+		</div>
+		<div class="row" style="align-items:flex-start;gap:20px">
+			<div class="tbl" style="flex:999 1 520px;min-width:0">
+				<div class="scroll">
+					<table>
+						<thead>
+							<tr>
+								if vm.Tab == "universities" {
+									<th>University</th><th>Country</th><th>Added by</th><th>Applications</th><th></th>
+								} else {
+									<th>Consultancy</th><th>Added by</th><th>Students</th><th></th>
+								}
+							</tr>
+						</thead>
+						<tbody>
+							if vm.Tab == "universities" {
+								for _, r := range vm.Universities {
+									<tr>
+										<td class="b">{ r.Name }</td>
+										<td>{ r.Country }</td>
+										<td><span class={ addedByClass(r) }>{ addedBy(r) }</span></td>
+										<td>{ strconv.Itoa(r.Uses) }</td>
+										<td>
+											@catalogDelete(r, "universities")
+										</td>
+									</tr>
+								}
+							} else {
+								for _, r := range vm.Consultancies {
+									<tr>
+										<td class="b">{ r.Name }</td>
+										<td><span class={ addedByClass(r) }>{ addedBy(r) }</span></td>
+										<td>{ strconv.Itoa(r.Uses) }</td>
+										<td>
+											@catalogDelete(r, "consultancies")
+										</td>
+									</tr>
+								}
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<form class="card" method="post" action={ templ.SafeURL("/admin/catalog/" + vm.Tab) } style="flex:1 1 280px">
+				@layout.CSRF()
+				if vm.Tab == "universities" {
+					<h2>Add university</h2>
+					@components.Field("Name", "name", vm.Name, "text", "", "", vm.Err)
+					<label class="f">
+						Country
+						<select name="country">
+							for _, c := range model.Countries {
+								<option value={ c } selected?={ c == orDefault(vm.Country, "Sweden") }>{ c }</option>
+							}
+						</select>
+					</label>
+					<button class="btn pri" type="submit">Add university</button>
+				} else {
+					<h2>Add consultancy</h2>
+					@components.Field("Consultancy name", "name", vm.Name, "text", "", "", vm.Err)
+					<button class="btn pri" type="submit">Add consultancy</button>
+				}
+			</form>
+		</div>
+	}
+}
+
+templ catalogDelete(r CatalogRow, kind string) {
+	if r.Uses == 0 {
+		<form class="inline" method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/%d/delete", kind, r.ID)) } data-confirm={ "Remove “" + r.Name + "” from the list?" }>
+			@layout.CSRF()
+			<button class="lnk" type="submit" style="color:#A12622">Remove</button>
+		</form>
+	} else {
+		<span class="small muted" title="In use, so it can’t be removed">In use</span>
+	}
+}
+
+func roleBadge(r model.Role) string {
+	switch r {
+	case model.RoleAdmin:
+		return "badge b-admin"
+	case model.RoleConsultant:
+		return "badge b-consultant"
+	}
+	return "badge b-network"
+}
+
+func branchCell(u UserRow) string {
+	switch {
+	case u.Branch != "":
+		return u.Branch
+	case u.Role == model.RoleAdmin:
+		return "All"
+	}
+	return "—"
+}
+
+var roleOptions = []model.Option{
+	{Value: string(model.RoleConsultant), Label: "Consultant"},
+	{Value: string(model.RoleAgentNetwork), Label: "Agent network"},
+	{Value: string(model.RoleAdmin), Label: "Admin"},
+}
+
+templ Users(vm UsersVM) {
+	@layout.Page("Users & branches", "users") {
+		<div class="head">
+			<div>
+				<h1>Users &amp; branches</h1>
+				<p class="sub">One consultant per branch. The agent network works across branches on B2B students. Passwords are generated here and shown once.</p>
+			</div>
+		</div>
+		if p := vm.NewPassword; p != nil {
+			<div class="card" style="border:2px solid var(--p)">
+				<h2>Password for { p.Name }</h2>
+				<p class="sub">User ID: <b>{ p.Email }</b>. Copy the password now; it won’t be shown again.</p>
+				<code class="pw" id="newPw">{ p.Password }</code>
+				<div class="row">
+					<button class="btn pri" type="button" data-copy={ "User ID: " + p.Email + "\nPassword: " + p.Password }>Copy user ID &amp; password</button>
+					<a class="btn" href="/admin/users">Done</a>
+				</div>
+			</div>
+		}
+		<div class="row" style="align-items:flex-start;gap:20px">
+			<div class="tbl" style="flex:999 1 560px;min-width:0">
+				<div class="scroll">
+					<table>
+						<thead><tr><th>Name</th><th>User ID</th><th>Role</th><th>Branch</th><th>Status</th><th>Actions</th></tr></thead>
+						<tbody>
+							for _, u := range vm.Users {
+								<tr>
+									<td class="b">{ u.Name }</td>
+									<td class="muted">{ u.Email }</td>
+									<td><span class={ roleBadge(u.Role) }>{ u.Role.Label() }</span></td>
+									<td>{ branchCell(u) }</td>
+									<td>
+										if u.Active {
+											<span class="badge b-on">Active</span>
+										} else {
+											<span class="badge b-off">Deactivated</span>
+										}
+									</td>
+									<td>
+										<div class="row" style="gap:14px;flex-wrap:nowrap">
+											<form class="inline" method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/users/%d/reset", u.ID)) } data-confirm={ "Generate a new password for " + u.Name + "? Their current password stops working and they are signed out." }>
+												@layout.CSRF()
+												<button class="lnk" type="submit">Reset password</button>
+											</form>
+											if u.ID != vm.MeID {
+												<form class="inline" method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/users/%d/toggle", u.ID)) }>
+													@layout.CSRF()
+													<button class="lnk" type="submit">
+														if u.Active {
+															Deactivate
+														} else {
+															Reactivate
+														}
+													</button>
+												</form>
+											}
+										</div>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<form class="card" method="post" action="/admin/users" style="flex:1 1 300px" autocomplete="off">
+				@layout.CSRF()
+				<h2>Create user</h2>
+				@components.Field("Full name", "name", vm.Form.Name, "text", "", "", vm.Errs["name"])
+				<label class="f">
+					Role
+					<select name="role" data-role-select>
+						for _, o := range roleOptions {
+							<option value={ o.Value } selected?={ o.Value == orDefault(vm.Form.Role, "consultant") }>{ o.Label }</option>
+						}
+					</select>
+				</label>
+				<label class={ "f", templ.KV("has-err", vm.Errs["branch"] != "") } data-branch-field hidden?={ orDefault(vm.Form.Role, "consultant") != "consultant" }>
+					Branch
+					<select name="branch_id">
+						for _, b := range vm.FreeBranches {
+							<option value={ b.Value } selected?={ b.Value == vm.Form.Branch }>{ b.Label }</option>
+						}
+					</select>
+					if len(vm.FreeBranches) == 0 {
+						<span class="hint">Every branch already has an active consultant. Deactivate one first.</span>
+					}
+					if e := vm.Errs["branch"]; e != "" {
+						<span class="err">{ e }</span>
+					}
+				</label>
+				<p class="small muted" style="margin:0" data-network-hint hidden?={ vm.Form.Role != "agent_network" }>The agent network handles external consultancies (B2B) and sees all B2B students. There’s no branch to pick.</p>
+				@components.Field("User ID (email)", "email", vm.Form.Email, "email", "name@snycosmos.com", "", vm.Errs["email"])
+				<button class="btn pri" type="submit">Create &amp; generate password</button>
+			</form>
+		</div>
+		<p class="small muted">Database size: { vm.DBSize }</p>
+	}
+}

@@ -72,3 +72,27 @@ func (a *Application) Tuition() string {
 	}
 	return s
 }
+
+// AppRow is one line of the admin applications table.
+type AppRow struct {
+	ID              int64
+	StudentID       int64
+	FirstName       string
+	FamilyName      string
+	Email           string
+	Uni             string
+	Country         string
+	Custom          bool
+	Programme       string
+	Level           string
+	Intake          string
+	Year            string
+	BranchName      string
+	ConsultancyName string
+	OwnerName       string
+	Status          string
+	UpdatedAt       time.Time
+}
+
+func (r *AppRow) Code() string        { return ApplicationCode(r.ID) }
+func (r *AppRow) StudentName() string { return FullName(r.FirstName, r.FamilyName) }

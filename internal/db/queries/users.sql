@@ -29,3 +29,11 @@ UPDATE users SET active = $2, auth_version = auth_version + 1 WHERE id = $1;
 
 -- name: ActiveConsultantForBranch :one
 SELECT id FROM users WHERE role = 'consultant' AND active AND branch_id = $1;
+
+-- name: FreeConsultantBranches :many
+SELECT b.id, b.name FROM branches b
+WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.branch_id = b.id AND u.role = 'consultant' AND u.active)
+ORDER BY b.id;
+
+-- name: DatabaseSize :one
+SELECT pg_database_size(current_database())::bigint;

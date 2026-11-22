@@ -89,3 +89,79 @@ func plural(n int, one, many string) string {
 	}
 	return fmt.Sprintf("%d %s", n, many)
 }
+
+// ---- admin: applications ----
+
+type AppFilterForm struct {
+	Q, Branch, Country, University, Status, Intake, Level, Source, Consultancy, From, To string
+}
+
+func (f AppFilterForm) Active() int {
+	n := 0
+	for _, v := range []string{f.Q, f.Branch, f.Country, f.University, f.Status, f.Intake, f.Level, f.Source, f.Consultancy, f.From, f.To} {
+		if v != "" {
+			n++
+		}
+	}
+	return n
+}
+
+type AppStats struct{ Total, Waiting, Admitted, B2B int }
+
+type ApplicationsVM struct {
+	Rows          []model.AppRow
+	Stats         AppStats
+	F             AppFilterForm
+	Branches      []model.Option
+	Countries     []model.Option
+	Universities  []model.Option
+	Intakes       []model.Option
+	Consultancies []model.Option
+	ExportHref    string
+}
+
+func studentFromApps(id int64) string { return fmt.Sprintf("/students/%d?from=applications", id) }
+
+// ---- admin: catalog ----
+
+type CatalogRow struct {
+	ID      int64
+	Name    string
+	Country string
+	AddedBy string // "" = admin
+	Uses    int
+}
+
+type CatalogVM struct {
+	Tab           string // "universities" | "consultancies"
+	Universities  []CatalogRow
+	Consultancies []CatalogRow
+	Err           string
+	Name          string
+	Country       string
+}
+
+// ---- admin: users ----
+
+type UserRow struct {
+	ID     int64
+	Name   string
+	Email  string
+	Role   model.Role
+	Branch string
+	Active bool
+}
+
+type NewPassword struct{ Name, Email, Password string }
+
+type UserForm struct{ Name, Email, Role, Branch string }
+
+type UsersVM struct {
+	Users        []UserRow
+	FreeBranches []model.Option
+	NewPassword  *NewPassword
+	Errs         map[string]string
+	Form         UserForm
+	DBSize       string
+	MeID         int64
+}

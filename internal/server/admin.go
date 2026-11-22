@@ -3,15 +3,26 @@ package server
 import (
 	"net/http"
 
+	"github.com/ChandraShekar2001/application-tracker/internal/applications"
 	"github.com/ChandraShekar2001/application-tracker/internal/auth"
 	"github.com/ChandraShekar2001/application-tracker/internal/catalog"
-	"github.com/ChandraShekar2001/application-tracker/internal/web"
-	"github.com/ChandraShekar2001/application-tracker/internal/web/pages"
+	"github.com/ChandraShekar2001/application-tracker/internal/users"
 )
 
-// registerAdmin mounts admin tools (milestone 6). Placeholder for now.
-func registerAdmin(app *http.ServeMux, am *auth.Manager, d Deps, cat *catalog.Service, admin func(http.Handler) http.Handler) {
-	app.Handle("GET /applications", admin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		web.OK(w, r, pages.Placeholder("Applications", "applications"))
-	})))
+// registerAdmin mounts admin-only tools. Everything here is behind RequireRole(admin).
+func registerAdmin(app *http.ServeMux, am *auth.Manager, d Deps, cat *catalog.Service, ah *applications.Handlers, admin func(http.Handler) http.Handler) {
+	a := func(f http.HandlerFunc) http.Handler { return admin(f) }
+
+	app.Handle("GET /applications", a(ah.AdminList))
+
+	ch := &catalog.AdminHandlers{Svc: cat, Auth: am}
+	app.Handle("GET /admin/catalog", a(ch.Page))
+	app.Handle("POST /admin/catalog/{kind}", a(ch.Add))
+	app.Handle("POST /admin/catalog/{kind}/{id}/delete", a(ch.Delete))
+
+	uh := &users.Handlers{Pool: d.Pool, Auth: am}
+	app.Handle("GET /admin/users", a(uh.Page))
+	app.Handle("POST /admin/users", a(uh.Create))
+	app.Handle("POST /admin/users/{id}/reset", a(uh.Reset))
+	app.Handle("POST /admin/users/{id}/toggle", a(uh.Toggle))
 }

@@ -48,6 +48,43 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (int64, 
 	return id, err
 }
 
+const databaseSize = `-- name: DatabaseSize :one
+SELECT pg_database_size(current_database())::bigint
+`
+
+func (q *Queries) DatabaseSize(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, databaseSize)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const freeConsultantBranches = `-- name: FreeConsultantBranches :many
+SELECT b.id, b.name FROM branches b
+WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.branch_id = b.id AND u.role = 'consultant' AND u.active)
+ORDER BY b.id
+`
+
+func (q *Queries) FreeConsultantBranches(ctx context.Context) ([]Branch, error) {
+	rows, err := q.db.Query(ctx, freeConsultantBranches)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Branch
+	for rows.Next() {
+		var i Branch
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT u.id, u.name, u.email, u.role, u.branch_id, b.name AS branch_name,
        u.password_hash, u.active, u.auth_version, u.created_at

@@ -25,6 +25,49 @@ func (q *Queries) CreateConsultancy(ctx context.Context, arg CreateConsultancyPa
 	return id, err
 }
 
+const createUniversity = `-- name: CreateUniversity :one
+INSERT INTO universities (name, country, created_by) VALUES ($1, $2, $3) RETURNING id
+`
+
+type CreateUniversityParams struct {
+	Name      string
+	Country   string
+	CreatedBy *int64
+}
+
+func (q *Queries) CreateUniversity(ctx context.Context, arg CreateUniversityParams) (int64, error) {
+	row := q.db.QueryRow(ctx, createUniversity, arg.Name, arg.Country, arg.CreatedBy)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const deleteUnusedConsultancy = `-- name: DeleteUnusedConsultancy :execrows
+DELETE FROM consultancies c WHERE c.id = $1
+  AND NOT EXISTS (SELECT 1 FROM students s WHERE s.consultancy_id = c.id)
+`
+
+func (q *Queries) DeleteUnusedConsultancy(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUnusedConsultancy, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteUnusedUniversity = `-- name: DeleteUnusedUniversity :execrows
+DELETE FROM universities u WHERE u.id = $1
+  AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.university_id = u.id)
+`
+
+func (q *Queries) DeleteUnusedUniversity(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUnusedUniversity, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getConsultancy = `-- name: GetConsultancy :one
 SELECT id, name FROM consultancies WHERE id = $1
 `
@@ -120,6 +163,47 @@ func (q *Queries) ListConsultancies(ctx context.Context) ([]ListConsultanciesRow
 	return items, nil
 }
 
+const listConsultanciesAdmin = `-- name: ListConsultanciesAdmin :many
+SELECT c.id, c.name, cb.name AS added_by_name, cb.role AS added_by_role,
+       (SELECT count(*) FROM students s WHERE s.consultancy_id = c.id)::int AS uses
+FROM consultancies c LEFT JOIN users cb ON cb.id = c.created_by
+ORDER BY lower(c.name)
+`
+
+type ListConsultanciesAdminRow struct {
+	ID          int64
+	Name        string
+	AddedByName *string
+	AddedByRole *string
+	Uses        int32
+}
+
+func (q *Queries) ListConsultanciesAdmin(ctx context.Context) ([]ListConsultanciesAdminRow, error) {
+	rows, err := q.db.Query(ctx, listConsultanciesAdmin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListConsultanciesAdminRow
+	for rows.Next() {
+		var i ListConsultanciesAdminRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.AddedByName,
+			&i.AddedByRole,
+			&i.Uses,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCountries = `-- name: ListCountries :many
 SELECT country::text AS country FROM universities
 UNION
@@ -167,6 +251,49 @@ func (q *Queries) ListUniversities(ctx context.Context) ([]ListUniversitiesRow, 
 	for rows.Next() {
 		var i ListUniversitiesRow
 		if err := rows.Scan(&i.ID, &i.Name, &i.Country); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUniversitiesAdmin = `-- name: ListUniversitiesAdmin :many
+SELECT u.id, u.name, u.country, cb.name AS added_by_name, cb.role AS added_by_role,
+       (SELECT count(*) FROM applications a WHERE a.university_id = u.id)::int AS uses
+FROM universities u LEFT JOIN users cb ON cb.id = u.created_by
+ORDER BY lower(u.name)
+`
+
+type ListUniversitiesAdminRow struct {
+	ID          int64
+	Name        string
+	Country     string
+	AddedByName *string
+	AddedByRole *string
+	Uses        int32
+}
+
+func (q *Queries) ListUniversitiesAdmin(ctx context.Context) ([]ListUniversitiesAdminRow, error) {
+	rows, err := q.db.Query(ctx, listUniversitiesAdmin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUniversitiesAdminRow
+	for rows.Next() {
+		var i ListUniversitiesAdminRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Country,
+			&i.AddedByName,
+			&i.AddedByRole,
+			&i.Uses,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

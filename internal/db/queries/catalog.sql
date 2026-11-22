@@ -32,3 +32,26 @@ SELECT country::text AS country FROM universities
 UNION
 SELECT custom_university_country::text FROM applications WHERE custom_university_country IS NOT NULL
 ORDER BY 1;
+
+-- name: ListUniversitiesAdmin :many
+SELECT u.id, u.name, u.country, cb.name AS added_by_name, cb.role AS added_by_role,
+       (SELECT count(*) FROM applications a WHERE a.university_id = u.id)::int AS uses
+FROM universities u LEFT JOIN users cb ON cb.id = u.created_by
+ORDER BY lower(u.name);
+
+-- name: ListConsultanciesAdmin :many
+SELECT c.id, c.name, cb.name AS added_by_name, cb.role AS added_by_role,
+       (SELECT count(*) FROM students s WHERE s.consultancy_id = c.id)::int AS uses
+FROM consultancies c LEFT JOIN users cb ON cb.id = c.created_by
+ORDER BY lower(c.name);
+
+-- name: CreateUniversity :one
+INSERT INTO universities (name, country, created_by) VALUES ($1, $2, $3) RETURNING id;
+
+-- name: DeleteUnusedUniversity :execrows
+DELETE FROM universities u WHERE u.id = $1
+  AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.university_id = u.id);
+
+-- name: DeleteUnusedConsultancy :execrows
+DELETE FROM consultancies c WHERE c.id = $1
+  AND NOT EXISTS (SELECT 1 FROM students s WHERE s.consultancy_id = c.id);

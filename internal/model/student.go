@@ -79,12 +79,21 @@ type Activity struct {
 	At        time.Time
 }
 
-// FormatDate renders dates like "05 Mar 2026"; zero time renders "".
+// IST is the business timezone (all branches are in India).
+var IST = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		return time.FixedZone("IST", 5*3600+1800)
+	}
+	return loc
+}()
+
+// FormatDate renders dates like "05 Mar 2026" in IST; zero time renders "".
 func FormatDate(t time.Time) string {
 	if t.IsZero() {
 		return ""
 	}
-	return t.Format("02 Jan 2006")
+	return t.In(IST).Format("02 Jan 2006")
 }
 
 // FormatISODate turns "2026-03-05" into "05 Mar 2026" (passes through anything else).

@@ -1,6 +1,7 @@
 package applications
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -226,4 +227,43 @@ func (h *Handlers) SearchUniversities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	web.OK(w, r, pages.UniSearchResults(unis))
+}
+
+// AdminList is the admin "all applications" view.
+func (h *Handlers) AdminList(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	q := r.URL.Query()
+	f := ParseFilter(q)
+	rows, st, err := h.Svc.Search(ctx, access.ScopeOf(reqctx.User(ctx)), f)
+	if err != nil {
+		web.ServerError(w, r, err)
+		return
+	}
+	vm := pages.ApplicationsVM{
+		Rows:  rows,
+		Stats: pages.AppStats{Total: st.Total, Waiting: st.Waiting, Admitted: st.Admitted, B2B: st.B2B},
+		F: pages.AppFilterForm{
+			Q: q.Get("q"), Branch: q.Get("branch"), Country: q.Get("country"), University: q.Get("university"),
+			Status: q.Get("status"), Intake: q.Get("intake"), Level: q.Get("level"), Source: q.Get("source"),
+			Consultancy: q.Get("consultancy"), From: q.Get("from"), To: q.Get("to"),
+		},
+		ExportHref: "/applications/export.csv",
+	}
+	if e := r.URL.RawQuery; e != "" {
+		vm.ExportHref += "?" + e
+	}
+	for _, load := range []struct {
+		dst *[]model.Option
+		fn  func(context.Context) ([]model.Option, error)
+	}{
+		{&vm.Branches, h.Cat.BranchOptions}, {&vm.Countries, h.Cat.CountryOptions},
+		{&vm.Universities, h.Cat.UniversityOptions}, {&vm.Consultancies, h.Cat.ConsultancyOptions},
+		{&vm.Intakes, h.Svc.IntakeOptions},
+	} {
+		if *load.dst, err = load.fn(ctx); err != nil {
+			web.ServerError(w, r, err)
+			return
+		}
+	}
+	web.OK(w, r, pages.Applications(vm))
 }

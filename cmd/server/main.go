@@ -18,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata" // distroless has no zoneinfo; dates display in IST
 
 	"github.com/jackc/pgx/v5/pgxpool"
 

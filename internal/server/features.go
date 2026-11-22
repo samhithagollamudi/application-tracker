@@ -36,5 +36,5 @@ func registerFeatures(app *http.ServeMux, am *auth.Manager, d Deps, notFound htt
 	app.Handle("POST /applications/{id}/delete", login(ah.Delete))
 	app.Handle("GET /catalog/universities/search", login(ah.SearchUniversities))
 
-	registerAdmin(app, am, d, cat, admin)
+	registerAdmin(app, am, d, cat, ah, admin)
 }
