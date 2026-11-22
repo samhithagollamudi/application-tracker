@@ -12,7 +12,6 @@ import (
 	"github.com/ChandraShekar2001/application-tracker/internal/auth"
 	"github.com/ChandraShekar2001/application-tracker/internal/config"
 	"github.com/ChandraShekar2001/application-tracker/internal/httpx"
-	"github.com/ChandraShekar2001/application-tracker/internal/model"
 	"github.com/ChandraShekar2001/application-tracker/internal/reqctx"
 	"github.com/ChandraShekar2001/application-tracker/internal/web"
 	"github.com/ChandraShekar2001/application-tracker/internal/web/static"
@@ -31,8 +30,6 @@ func New(d Deps) http.Handler {
 
 	app := http.NewServeMux()
 	login := auth.RequireLogin
-	adminOnly := auth.RequireRole(notFound, model.RoleAdmin)
-	_ = adminOnly
 
 	app.HandleFunc("GET /login", am.LoginPage)
 	app.HandleFunc("POST /login", am.Login)

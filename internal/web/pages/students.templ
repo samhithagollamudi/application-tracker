@@ -1,0 +1,330 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/ChandraShekar2001/application-tracker/internal/model"
+	"github.com/ChandraShekar2001/application-tracker/internal/web/components"
+	"github.com/ChandraShekar2001/application-tracker/internal/web/layout"
+)
+
+templ Students(vm StudentsVM) {
+	@layout.Page(vm.Title, "students") {
+		<div class="head">
+			<div>
+				<h1>{ vm.Title }</h1>
+				<p class="sub">{ vm.Subtitle }</p>
+			</div>
+			if vm.CanCreate {
+				<a class="btn pri" href="/students/new">+ New student</a>
+			}
+		</div>
+		<form
+			class="filters"
+			method="get"
+			action="/students"
+			hx-get="/students"
+			hx-target="#results"
+			hx-select="#results"
+			hx-swap="outerHTML"
+			hx-push-url="true"
+			hx-trigger="change, input changed delay:300ms from:#q"
+		>
+			<label class="f span2">
+				Search
+				<input id="q" name="q" type="search" value={ vm.F.Q } placeholder="Name, email, student ID or application number"/>
+			</label>
+			if vm.ShowBranch {
+				@components.FilterSelect("Branch", "branch", vm.F.Branch, "All branches", vm.Branches)
+			}
+			if vm.ShowConsultancy {
+				@components.FilterSelect("Consultancy", "consultancy", vm.F.Consultancy, "Any consultancy", vm.Consultancies)
+			}
+			@components.FilterSelect("Country", "country", vm.F.Country, "Any country", vm.Countries)
+			@components.FilterSelect("University", "university", vm.F.University, "Any university", vm.Universities)
+			@components.FilterSelect("Status (any application)", "status", vm.F.Status, "Any status", model.Statuses)
+			<noscript><button class="btn" type="submit">Apply filters</button></noscript>
+		</form>
+		@studentResults(vm)
+	}
+}
+
+templ studentResults(vm StudentsVM) {
+	<div class="tbl" id="results">
+		<div class="scroll">
+			<table>
+				<thead>
+					<tr>
+						<th>Student</th>
+						if vm.ShowBranch {
+							<th>Branch</th>
+						}
+						if vm.ShowConsultancy {
+							<th>Consultancy</th>
+						}
+						<th>Applications</th>
+						<th>Universities</th>
+						<th>Latest status</th>
+						<th>Updated</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, r := range vm.Rows {
+						<tr class="click" data-href={ studentHref(r.ID) }>
+							<td>
+								<a class="rowlink" href={ templ.SafeURL(studentHref(r.ID)) }>{ r.Name() }</a>
+								<div class="small muted">{ r.Code() } · { r.Email }</div>
+							</td>
+							if vm.ShowBranch {
+								<td>
+									@components.Dash(r.BranchName)
+								</td>
+							}
+							if vm.ShowConsultancy {
+								<td>
+									@components.Dash(r.ConsultancyName)
+								</td>
+							}
+							<td class="b">{ strconv.Itoa(r.AppCount) }</td>
+							<td class="muted" style="white-space:normal;min-width:180px">
+								@components.Dash(r.Universities)
+							</td>
+							<td>
+								if r.LatestStatus == nil {
+									<span class="muted">No applications</span>
+								} else {
+									@components.StatusBadge(*r.LatestStatus)
+								}
+							</td>
+							<td class="muted">{ model.FormatDate(r.UpdatedAt) }</td>
+						</tr>
+					}
+					if len(vm.Rows) == 0 {
+						<tr><td colspan={ strconv.Itoa(vm.Cols()) } class="muted" style="padding:28px;text-align:center">No students match.</td></tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<div class="small muted" style="padding:12px 14px">
+			{ plural(vm.Total, "student", "students") }
+			if vm.Total > len(vm.Rows) {
+				· showing the { strconv.Itoa(len(vm.Rows)) } most recently updated. Narrow the filters to see others.
+			}
+		</div>
+	</div>
+}
+
+func detailActive(from string) string {
+	if from == "applications" {
+		return "applications"
+	}
+	return "students"
+}
+
+func sourceLine(s *model.Student) string {
+	if s.Source == "b2b" {
+		c := s.ConsultancyName
+		if c == "" {
+			c = "—"
+		}
+		return "B2B · Consultancy: " + c
+	}
+	return s.BranchName + " branch"
+}
+
+templ StudentDetail(vm StudentDetailVM) {
+	@layout.Page(vm.S.Name(), detailActive(vm.From)) {
+		<nav class="small muted" aria-label="Breadcrumb">
+			if vm.From == "applications" {
+				<a href="/applications">Applications</a>
+			} else {
+				<a href="/students">Students</a>
+			}
+			/ { vm.S.Name() }
+		</nav>
+		<section class="card" style="flex-direction:row;flex-wrap:wrap;justify-content:space-between;align-items:center">
+			<div style="display:flex;flex-direction:column;gap:4px">
+				<h1 style="font-size:24px">{ vm.S.Name() }</h1>
+				<div class="muted">{ vm.S.Code() } · { vm.S.Email }</div>
+				<div class="small muted">{ sourceLine(vm.S) } · Owner: { vm.S.OwnerName } · Created { model.FormatDate(vm.S.CreatedAt) }</div>
+			</div>
+			<div class="row">
+				<a class="btn" href={ templ.SafeURL(fmt.Sprintf("/students/%d/edit", vm.S.ID)) }>Edit details</a>
+				<a class="btn pri" href={ templ.SafeURL(fmt.Sprintf("/students/%d/applications/new", vm.S.ID)) }>+ Add application</a>
+			</div>
+		</section>
+		if vm.CanMove && vm.S.Source == "internal" {
+			<form class="card" method="post" action={ templ.SafeURL(fmt.Sprintf("/students/%d/move", vm.S.ID)) } style="flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:12px">
+				@layout.CSRF()
+				<label class="f" style="min-width:220px">
+					Move to branch (admin only)
+					<select name="branch_id">
+						for _, b := range vm.Branches {
+							<option value={ b.Value } selected?={ b.Label == vm.S.BranchName }>{ b.Label }</option>
+						}
+					</select>
+				</label>
+				<button class="btn" type="submit">Move student</button>
+				<span class="small muted">The student and all their applications move, and the owner becomes that branch’s consultant.</span>
+			</form>
+		}
+		<div class="row" style="align-items:flex-start;gap:20px">
+			<div style="flex:999 1 520px;min-width:0;display:flex;flex-direction:column;gap:14px">
+				<h2>Applications ({ strconv.Itoa(len(vm.Apps)) })</h2>
+				for _, a := range vm.Apps {
+					@AppCard(a)
+				}
+				if len(vm.Apps) == 0 {
+					<div class="card"><p class="sub">No applications yet.</p></div>
+				}
+			</div>
+			<aside style="flex:1 1 300px;display:flex;flex-direction:column;gap:14px">
+				<section class="card">
+					<h2>Student details</h2>
+					<dl class="kv">
+						@components.KV("Gender", vm.S.Gender)
+						@components.KV("Date of birth", model.FormatISODate(vm.S.DateOfBirth))
+						@components.KV("Address (as per passport)", vm.S.Address)
+					</dl>
+					<h3>Bachelor’s</h3>
+					<dl class="kv">
+						@components.KV("University", vm.S.BAUniversity)
+						@components.KV("Specialisation", vm.S.BASpecialisation)
+						@components.KV("Duration", vm.S.BADuration)
+						@components.KV("CGPA / %", vm.S.BAGrade)
+					</dl>
+					if vm.S.MAUniversity != "" || vm.S.MASpecialisation != "" {
+						<h3>Master’s</h3>
+						<dl class="kv">
+							@components.KV("University", vm.S.MAUniversity)
+							@components.KV("Specialisation", vm.S.MASpecialisation)
+							@components.KV("Duration", vm.S.MADuration)
+							@components.KV("CGPA / %", vm.S.MAGrade)
+						</dl>
+					}
+					<h3>12th class</h3>
+					<dl class="kv">
+						@components.KV("Board", vm.S.XIIBoard)
+						@components.KV("Subjects", vm.S.XIISubjects)
+						@components.KV("CGPA / %", vm.S.XIIGrade)
+					</dl>
+				</section>
+				<section class="card">
+					<h2>Activity</h2>
+					<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:13px">
+						for _, x := range vm.Activity {
+							<li><strong>{ x.Text }</strong><div class="muted">{ x.ActorName } · { model.FormatDate(x.At) }</div></li>
+						}
+					</ul>
+				</section>
+			</aside>
+		</div>
+	}
+}
+
+func formActive(action string) string {
+	if action == "/students/new" {
+		return "new"
+	}
+	return "students"
+}
+
+templ StudentForm(vm StudentFormVM) {
+	@layout.Page(vm.Title, formActive(vm.Action)) {
+		<div class="head">
+			<div>
+				<h1>{ vm.Title }</h1>
+				<p class="sub">{ vm.Sub }</p>
+			</div>
+		</div>
+		if len(vm.Errs) > 0 {
+			<div class="notice warn" role="alert">Please fix the highlighted fields.</div>
+		}
+		<form method="post" action={ templ.SafeURL(vm.Action) } data-guard novalidate autocomplete="off" style="display:flex;flex-direction:column;gap:18px">
+			@layout.CSRF()
+			if vm.ShowConsultancy {
+				@consultancyField(vm)
+			}
+			@studentFields(vm)
+			if vm.ShowApp {
+				@AppFields(vm.App, true)
+			}
+			<div class="card savebar">
+				<a class="btn" href={ templ.SafeURL(vm.CancelHref) }>Cancel</a>
+				<button class="btn pri" type="submit">{ vm.Submit }</button>
+			</div>
+		</form>
+	}
+}
+
+templ consultancyField(vm StudentFormVM) {
+	<section class="card">
+		<h2>Referred by</h2>
+		<div class="grid">
+			<div class={ "f", templ.KV("has-err", vm.Errs["consultancy"] != "") } data-cons>
+				<label for="consSel">Consultancy</label>
+				<select id="consSel" name="consultancy_id">
+					<option value="">Select consultancy</option>
+					for _, c := range vm.Consultancies {
+						<option value={ c.Value } selected?={ c.Value == vm.ConsultancyID }>{ c.Label }</option>
+					}
+					<option value="__other" selected?={ vm.ConsultancyID == "__other" }>Other (not in the list)</option>
+				</select>
+				<input name="consultancy_other" id="consOther" type="text" value={ vm.ConsOther } placeholder="Type the consultancy name" aria-label="Consultancy name" hidden?={ vm.ConsultancyID != "__other" }/>
+				if e := vm.Errs["consultancy"]; e != "" {
+					<span class="err">{ e }</span>
+				}
+			</div>
+		</div>
+		<p class="small muted" style="margin:0">The list is the one the admin maintains. A name typed under “Other” is added to the list.</p>
+	</section>
+}
+
+templ studentFields(vm StudentFormVM) {
+	<section class="card">
+		<h2>Student details</h2>
+		<div class="grid">
+			@components.Field("First name", "first_name", vm.F.FirstName, "text", "As on passport", "", vm.Errs["first_name"])
+			@components.Field("Family name", "family_name", vm.F.FamilyName, "text", "As on passport", "", vm.Errs["family_name"])
+			@components.Select("Gender", "gender", vm.F.Gender, model.Genders, "Select", vm.Errs["gender"])
+			@components.Field("Date of birth", "date_of_birth", vm.F.DateOfBirth, "date", "", "", vm.Errs["date_of_birth"])
+			<label class={ "f", templ.KV("has-err", vm.Errs["email"] != "") }>
+				Application email (required)
+				<input name="email" type="email" value={ vm.F.Email } placeholder="student@example.com" required aria-invalid?={ vm.Errs["email"] != "" }/>
+				if e := vm.Errs["email"]; e != "" {
+					<span class="err">
+						{ e }
+						if vm.DupHref != "" {
+							<a href={ templ.SafeURL(vm.DupHref) }>Open the existing student</a>
+						}
+					</span>
+				}
+			</label>
+			@components.TextArea("Address (as per passport)", "address", vm.F.Address, "full", vm.Errs["address"])
+		</div>
+	</section>
+	<section class="card">
+		<h2>Education history</h2>
+		<h3>Bachelor’s</h3>
+		<div class="grid">
+			@components.Field("University", "ba_university", vm.F.BAUniversity, "text", "", "", vm.Errs["ba_university"])
+			@components.Field("Specialisation", "ba_specialisation", vm.F.BASpecialisation, "text", "", "", vm.Errs["ba_specialisation"])
+			@components.Field("Duration", "ba_duration", vm.F.BADuration, "text", "e.g. 4 years", "", vm.Errs["ba_duration"])
+			@components.Field("CGPA / grade %", "ba_grade", vm.F.BAGrade, "text", "", "", vm.Errs["ba_grade"])
+		</div>
+		<h3>Master’s <span class="muted" style="font-weight:500">(if any)</span></h3>
+		<div class="grid">
+			@components.Field("University", "ma_university", vm.F.MAUniversity, "text", "", "", vm.Errs["ma_university"])
+			@components.Field("Specialisation", "ma_specialisation", vm.F.MASpecialisation, "text", "", "", vm.Errs["ma_specialisation"])
+			@components.Field("Duration", "ma_duration", vm.F.MADuration, "text", "", "", vm.Errs["ma_duration"])
+			@components.Field("CGPA / grade %", "ma_grade", vm.F.MAGrade, "text", "", "", vm.Errs["ma_grade"])
+		</div>
+		<h3>12th class</h3>
+		<div class="grid">
+			@components.Field("Examination board", "xii_board", vm.F.XIIBoard, "text", "e.g. CBSE, State board", "", vm.Errs["xii_board"])
+			@components.Field("Subjects", "xii_subjects", vm.F.XIISubjects, "text", "", "", vm.Errs["xii_subjects"])
+			@components.Field("CGPA / grade %", "xii_grade", vm.F.XIIGrade, "text", "", "", vm.Errs["xii_grade"])
+		</div>
+	</section>
+}

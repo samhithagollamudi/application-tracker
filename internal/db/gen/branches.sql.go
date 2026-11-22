@@ -9,6 +9,17 @@ import (
 	"context"
 )
 
+const getBranch = `-- name: GetBranch :one
+SELECT id, name FROM branches WHERE id = $1
+`
+
+func (q *Queries) GetBranch(ctx context.Context, id int16) (Branch, error) {
+	row := q.db.QueryRow(ctx, getBranch, id)
+	var i Branch
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const listBranches = `-- name: ListBranches :many
 SELECT id, name FROM branches ORDER BY id
 `

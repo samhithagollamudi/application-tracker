@@ -104,3 +104,10 @@ details.after summary{font-weight:800;cursor:pointer}
 .side .logo-img{width:200px;height:auto;padding:0 8px}
 .me form{margin:0}
 .role-consultant{background:var(--p)}.role-other{background:var(--b)}
+.f .err{font-size:12px;font-weight:600;color:#A12622}
+.f.has-err input,.f.has-err select,.f.has-err textarea{border-color:#A12622}
+.notice.warn{background:#FDECEC;color:#A12622}
+a.rowlink{color:var(--b);font-weight:700;text-decoration:none}
+.savebar{position:sticky;bottom:0;flex-direction:row;justify-content:flex-end;flex-wrap:wrap;padding:14px 18px}
+.inline{display:inline}
+.htmx-request.tbl,.htmx-request .tbl{opacity:.6;transition:opacity .2s}

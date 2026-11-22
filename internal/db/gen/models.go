@@ -5,6 +5,8 @@
 package gen
 
 import (
+	"time"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -14,7 +16,7 @@ type ActivityLog struct {
 	ActorID   int64
 	Action    string
 	Detail    []byte
-	CreatedAt pgtype.Timestamptz
+	CreatedAt time.Time
 }
 
 type Application struct {
@@ -37,8 +39,8 @@ type Application struct {
 	TuitionPer              *string
 	Scholarship             *string
 	CreatedBy               int64
-	CreatedAt               pgtype.Timestamptz
-	UpdatedAt               pgtype.Timestamptz
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 type Branch struct {
@@ -50,13 +52,13 @@ type Consultancy struct {
 	ID        int64
 	Name      string
 	CreatedBy *int64
-	CreatedAt pgtype.Timestamptz
+	CreatedAt time.Time
 }
 
 type Session struct {
 	Token  string
 	Data   []byte
-	Expiry pgtype.Timestamptz
+	Expiry time.Time
 }
 
 type Student struct {
@@ -82,8 +84,8 @@ type Student struct {
 	XiiBoard         *string
 	XiiSubjects      *string
 	XiiGrade         *string
-	CreatedAt        pgtype.Timestamptz
-	UpdatedAt        pgtype.Timestamptz
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type University struct {
@@ -91,7 +93,7 @@ type University struct {
 	Name      string
 	Country   string
 	CreatedBy *int64
-	CreatedAt pgtype.Timestamptz
+	CreatedAt time.Time
 }
 
 type User struct {
@@ -102,6 +104,6 @@ type User struct {
 	BranchID     *int16
 	PasswordHash string
 	Active       bool
-	CreatedAt    pgtype.Timestamptz
+	CreatedAt    time.Time
 	AuthVersion  int32
 }

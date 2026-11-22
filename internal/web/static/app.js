@@ -33,3 +33,71 @@ document.addEventListener('submit', (e) => {
   const f = e.target;
   if (f.dataset && f.dataset.confirm && !window.confirm(f.dataset.confirm)) e.preventDefault();
 }, true);
+
+// ---- University search box (results come from htmx: /catalog/universities/search) ----
+(function () {
+  const parts = (c) => {
+    const form = c.closest('form');
+    return {
+      q: c.querySelector('.combo-q'), id: c.querySelector('[name=university_id]'),
+      name: c.querySelector('[name=university_name]'), list: c.querySelector('.combo-list'),
+      other: c.querySelector('.combo-other'), otherName: c.querySelector('[name=uni_other]'),
+      country: form.querySelector('#uniCountry'), countrySel: form.querySelector('#uniCountrySel'),
+    };
+  };
+  const close = (p) => { p.list.hidden = true; p.q.setAttribute('aria-expanded', 'false'); };
+  function setOther(c, on) {
+    const p = parts(c);
+    p.q.hidden = on; p.other.hidden = !on; p.country.hidden = on; p.countrySel.hidden = !on; close(p);
+    if (on) { p.id.value = ''; p.name.value = ''; p.otherName.value = p.q.value; p.otherName.focus(); }
+    else { p.otherName.value = ''; p.countrySel.value = ''; p.q.focus(); }
+  }
+  document.addEventListener('htmx:afterSwap', (e) => {
+    if (e.target.classList.contains('combo-list')) {
+      e.target.hidden = false;
+      e.target.closest('[data-combo]').querySelector('.combo-q').setAttribute('aria-expanded', 'true');
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const pick = e.target.closest('[data-pick]');
+    if (pick) {
+      const c = pick.closest('[data-combo]'), p = parts(c);
+      if (pick.dataset.pick === '__other') { setOther(c, true); return; }
+      p.id.value = pick.dataset.pick; p.name.value = pick.dataset.name;
+      p.q.value = pick.dataset.name; p.country.value = pick.dataset.country; close(p);
+      return;
+    }
+    const back = e.target.closest('[data-combo-back]');
+    if (back) { setOther(back.closest('[data-combo]'), false); return; }
+    document.querySelectorAll('[data-combo]').forEach((c) => { if (!c.contains(e.target)) close(parts(c)); });
+  });
+  document.addEventListener('input', (e) => {
+    if (e.target.classList.contains('combo-q')) {
+      const p = parts(e.target.closest('[data-combo]'));
+      p.id.value = ''; p.name.value = ''; p.country.value = '';
+    }
+    if ('digits' in e.target.dataset) {
+      const v = e.target.value.replace(/\D/g, '');
+      if (v !== e.target.value) e.target.value = v;
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('[data-combo]').forEach((c) => close(parts(c)));
+    if (e.key === 'Enter' && e.target.matches('tr[data-href]')) location.href = e.target.dataset.href;
+  });
+})();
+
+// "Other" consultancy shows a text box.
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'consSel') {
+    const o = document.getElementById('consOther');
+    o.hidden = e.target.value !== '__other';
+    if (!o.hidden) o.focus();
+  }
+});
+
+// Whole table rows are clickable (links inside still work normally).
+document.addEventListener('click', (e) => {
+  const tr = e.target.closest('tr[data-href]');
+  if (tr && !e.target.closest('a,button,input,select,label')) location.href = tr.dataset.href;
+});

@@ -1,0 +1,105 @@
+package components
+
+import "github.com/ChandraShekar2001/application-tracker/internal/model"
+
+// Field is a labelled text-like input. cls adds grid classes ("full", "span2").
+templ Field(label, name, value, typ, placeholder, cls, err string) {
+	<label class={ "f", cls, templ.KV("has-err", err != "") }>
+		{ label }
+		<input name={ name } type={ typ } value={ value } placeholder={ placeholder } aria-invalid?={ err != "" }/>
+		if err != "" {
+			<span class="err">{ err }</span>
+		}
+	</label>
+}
+
+// Select is a labelled dropdown. blank is the empty option's text ("" = no empty option).
+templ Select(label, name, value string, opts []model.Option, blank, err string) {
+	<label class={ "f", templ.KV("has-err", err != "") }>
+		{ label }
+		<select name={ name }>
+			if blank != "" {
+				<option value="">{ blank }</option>
+			}
+			for _, o := range opts {
+				<option value={ o.Value } selected?={ o.Value == value }>{ o.Label }</option>
+			}
+		</select>
+		if err != "" {
+			<span class="err">{ err }</span>
+		}
+	</label>
+}
+
+templ TextArea(label, name, value, cls, err string) {
+	<label class={ "f", cls, templ.KV("has-err", err != "") }>
+		{ label }
+		<textarea name={ name }>{ value }</textarea>
+		if err != "" {
+			<span class="err">{ err }</span>
+		}
+	</label>
+}
+
+// FilterSelect is a select inside a filter bar ("Any …" as the empty choice).
+templ FilterSelect(label, name, value, anyLabel string, opts []model.Option) {
+	<label class="f">
+		{ label }
+		<select name={ name }>
+			<option value="">{ anyLabel }</option>
+			for _, o := range opts {
+				<option value={ o.Value } selected?={ o.Value == value }>{ o.Label }</option>
+			}
+		</select>
+	</label>
+}
+
+templ StatusBadge(status string) {
+	<span class={ "badge", model.StatusClass(status) }>{ model.StatusLabel(status) }</span>
+}
+
+func stepIndex(status string) int {
+	for i, s := range model.ProgressSteps {
+		if s.Value == status {
+			return i
+		}
+	}
+	return -1
+}
+
+func dotClass(i, k int) string {
+	switch {
+	case i < 0:
+		return "dot"
+	case k < i:
+		return "dot done"
+	case k == i:
+		return "dot now"
+	}
+	return "dot"
+}
+
+templ Steps(status string) {
+	<ol class="steps" aria-label="Progress">
+		for k, s := range model.ProgressSteps {
+			<li><span class={ dotClass(stepIndex(status), k) }></span>{ s.Label }</li>
+		}
+	</ol>
+}
+
+templ Dash(v string) {
+	if v == "" {
+		<span class="muted">—</span>
+	} else {
+		{ v }
+	}
+}
+
+templ KV(label, value string) {
+	<div>
+		<dt>{ label }</dt>
+		<dd>
+			@Dash(value)
+		</dd>
+	</div>
+}

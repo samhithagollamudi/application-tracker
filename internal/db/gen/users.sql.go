@@ -7,8 +7,7 @@ package gen
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"time"
 )
 
 const activeConsultantForBranch = `-- name: ActiveConsultantForBranch :one
@@ -66,7 +65,7 @@ type GetUserByEmailRow struct {
 	PasswordHash string
 	Active       bool
 	AuthVersion  int32
-	CreatedAt    pgtype.Timestamptz
+	CreatedAt    time.Time
 }
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
@@ -104,7 +103,7 @@ type GetUserByIDRow struct {
 	PasswordHash string
 	Active       bool
 	AuthVersion  int32
-	CreatedAt    pgtype.Timestamptz
+	CreatedAt    time.Time
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error) {
@@ -140,7 +139,7 @@ type ListUsersRow struct {
 	BranchID   *int16
 	BranchName *string
 	Active     bool
-	CreatedAt  pgtype.Timestamptz
+	CreatedAt  time.Time
 }
 
 func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
