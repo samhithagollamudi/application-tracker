@@ -12,49 +12,49 @@ import (
 )
 
 // Filter is the admin applications filter set, parsed from the URL so views
-// are bookmarkable and the CSV export uses exactly the same rows.
+// are bookmarkable and the CSV export uses exactly the same rows. Every list
+// filter accepts several values (repeated query params); an empty list means "any".
 type Filter struct {
-	Q             string
-	BranchID      int16
-	Country       string
-	UniversityID  int64
-	Status        string
-	Intake        string // "autumn"/"spring"
-	Year          int16
-	Level         string
-	Source        string // internal | b2b
-	ConsultancyID int64
-	NoConsultancy bool
-	From, To      string // YYYY-MM-DD, created date (IST), inclusive
+	Q              string
+	BranchIDs      []int16
+	Countries      []string
+	UniversityIDs  []int64
+	Statuses       []string
+	Intakes        []string // "autumn-2027"
+	Levels         []string
+	Sources        []string // internal | b2b
+	ConsultancyIDs []int64
+	NoConsultancy  bool   // "none" was ticked: include students without a consultancy
+	From, To       string // YYYY-MM-DD, created date (IST), inclusive
+}
+
+var sources = []model.Option{{Value: "internal"}, {Value: "b2b"}}
+
+func validIntakes(vals []string) []string {
+	var out []string
+	for _, v := range model.NonEmpty(vals) {
+		in, y, ok := strings.Cut(v, "-")
+		if _, err := strconv.ParseInt(y, 10, 16); ok && err == nil && model.ValidOption(model.Intakes, in) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // ParseFilter reads a Filter from query values, ignoring invalid entries.
 func ParseFilter(q url.Values) Filter {
-	f := Filter{Q: strings.TrimSpace(q.Get("q")), Country: q.Get("country")}
-	if n, err := strconv.ParseInt(q.Get("branch"), 10, 16); err == nil {
-		f.BranchID = int16(n)
+	f := Filter{
+		Q:             strings.TrimSpace(q.Get("q")),
+		BranchIDs:     model.Int16s(q["branch"]),
+		Countries:     model.NonEmpty(q["country"]),
+		UniversityIDs: model.Int64s(q["university"]),
+		Statuses:      model.ValidValues(model.Statuses, q["status"]),
+		Intakes:       validIntakes(q["intake"]),
+		Levels:        model.ValidValues(model.Levels, q["level"]),
+		Sources:       model.ValidValues(sources, q["source"]),
 	}
-	f.UniversityID, _ = strconv.ParseInt(q.Get("university"), 10, 64)
-	if s := q.Get("status"); model.ValidOption(model.Statuses, s) {
-		f.Status = s
-	}
-	if in, y, ok := strings.Cut(q.Get("intake"), "-"); ok && model.ValidOption(model.Intakes, in) {
-		if n, err := strconv.ParseInt(y, 10, 16); err == nil {
-			f.Intake, f.Year = in, int16(n)
-		}
-	}
-	if l := q.Get("level"); model.ValidOption(model.Levels, l) {
-		f.Level = l
-	}
-	if s := q.Get("source"); s == "internal" || s == "b2b" {
-		f.Source = s
-	}
-	switch c := q.Get("consultancy"); c {
-	case "none":
-		f.NoConsultancy = true
-	default:
-		f.ConsultancyID, _ = strconv.ParseInt(c, 10, 64)
-	}
+	f.ConsultancyIDs = model.Int64s(q["consultancy"])
+	f.NoConsultancy = model.In("none", q["consultancy"])
 	if d := q.Get("from"); validDate(d) {
 		f.From = d
 	}
@@ -104,31 +104,34 @@ func where(scope access.Scope, f Filter, args *access.Args) string {
 		}
 		w = append(w, cond+`)`)
 	}
-	if f.BranchID != 0 {
-		w = append(w, `s.branch_id = `+args.Add(f.BranchID))
+	if len(f.BranchIDs) > 0 {
+		w = append(w, `s.branch_id = ANY(`+args.Add(f.BranchIDs)+`)`)
 	}
-	if f.Country != "" {
-		w = append(w, `coalesce(u.country, a.custom_university_country) = `+args.Add(f.Country))
+	if len(f.Countries) > 0 {
+		w = append(w, `coalesce(u.country, a.custom_university_country) = ANY(`+args.Add(f.Countries)+`)`)
 	}
-	if f.UniversityID != 0 {
-		w = append(w, `a.university_id = `+args.Add(f.UniversityID))
+	if len(f.UniversityIDs) > 0 {
+		w = append(w, `a.university_id = ANY(`+args.Add(f.UniversityIDs)+`)`)
 	}
-	if f.Status != "" {
-		w = append(w, `a.status = `+args.Add(f.Status))
+	if len(f.Statuses) > 0 {
+		w = append(w, `a.status = ANY(`+args.Add(f.Statuses)+`)`)
 	}
-	if f.Intake != "" {
-		w = append(w, `a.intake = `+args.Add(f.Intake)+` AND a.year = `+args.Add(f.Year))
+	if len(f.Intakes) > 0 {
+		w = append(w, `(a.intake || '-' || a.year::text) = ANY(`+args.Add(f.Intakes)+`)`)
 	}
-	if f.Level != "" {
-		w = append(w, `a.programme_level = `+args.Add(f.Level))
+	if len(f.Levels) > 0 {
+		w = append(w, `a.programme_level = ANY(`+args.Add(f.Levels)+`)`)
 	}
-	if f.Source != "" {
-		w = append(w, `s.source = `+args.Add(f.Source))
+	if len(f.Sources) > 0 {
+		w = append(w, `s.source = ANY(`+args.Add(f.Sources)+`)`)
 	}
-	if f.NoConsultancy {
+	switch {
+	case f.NoConsultancy && len(f.ConsultancyIDs) > 0:
+		w = append(w, `(s.consultancy_id IS NULL OR s.consultancy_id = ANY(`+args.Add(f.ConsultancyIDs)+`))`)
+	case f.NoConsultancy:
 		w = append(w, `s.consultancy_id IS NULL`)
-	} else if f.ConsultancyID != 0 {
-		w = append(w, `s.consultancy_id = `+args.Add(f.ConsultancyID))
+	case len(f.ConsultancyIDs) > 0:
+		w = append(w, `s.consultancy_id = ANY(`+args.Add(f.ConsultancyIDs)+`)`)
 	}
 	if f.From != "" {
 		w = append(w, `(a.created_at AT TIME ZONE 'Asia/Kolkata')::date >= `+args.Add(f.From)+`::date`)

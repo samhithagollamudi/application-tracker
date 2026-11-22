@@ -243,9 +243,9 @@ func (h *Handlers) AdminList(w http.ResponseWriter, r *http.Request) {
 		Rows:  rows,
 		Stats: pages.AppStats{Total: st.Total, Waiting: st.Waiting, Admitted: st.Admitted, B2B: st.B2B},
 		F: pages.AppFilterForm{
-			Q: q.Get("q"), Branch: q.Get("branch"), Country: q.Get("country"), University: q.Get("university"),
-			Status: q.Get("status"), Intake: q.Get("intake"), Level: q.Get("level"), Source: q.Get("source"),
-			Consultancy: q.Get("consultancy"), From: q.Get("from"), To: q.Get("to"),
+			Q: q.Get("q"), Branch: q["branch"], Country: q["country"], University: q["university"],
+			Status: q["status"], Intake: q["intake"], Level: q["level"], Source: q["source"],
+			Consultancy: q["consultancy"], From: q.Get("from"), To: q.Get("to"),
 		},
 		ExportHref: "/applications/export.csv",
 	}

@@ -101,26 +101,26 @@ func Students(vm StudentsVM) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if vm.ShowBranch {
-				templ_7745c5c3_Err = components.FilterSelect("Branch", "branch", vm.F.Branch, "All branches", vm.Branches).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = components.MultiSelect("Branch", "branch", "All branches", vm.Branches, vm.F.Branch).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if vm.ShowConsultancy {
-				templ_7745c5c3_Err = components.FilterSelect("Consultancy", "consultancy", vm.F.Consultancy, "Any consultancy", vm.Consultancies).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = components.MultiSelect("Consultancy", "consultancy", "Any consultancy", vm.Consultancies, vm.F.Consultancy).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = components.FilterSelect("Country", "country", vm.F.Country, "Any country", vm.Countries).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.MultiSelect("Country", "country", "Any country", vm.Countries, vm.F.Country).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = components.FilterSelect("University", "university", vm.F.University, "Any university", vm.Universities).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.MultiSelect("University", "university", "Any university", vm.Universities, vm.F.University).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = components.FilterSelect("Status (any application)", "status", vm.F.Status, "Any status", model.Statuses).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.MultiSelect("Status (any application)", "status", "Any status", model.Statuses, vm.F.Status).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

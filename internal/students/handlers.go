@@ -39,18 +39,17 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	u := reqctx.User(r.Context())
 	scope := access.ScopeOf(u)
 	q := r.URL.Query()
+	f := ListFilter{
+		Q:              q.Get("q"),
+		BranchIDs:      model.Int16s(q["branch"]),
+		ConsultancyIDs: model.Int64s(q["consultancy"]),
+		Countries:      model.NonEmpty(q["country"]),
+		UniversityIDs:  model.Int64s(q["university"]),
+		Statuses:       model.ValidValues(model.Statuses, q["status"]),
+	}
 	ff := pages.StudentFilterForm{
-		Q: q.Get("q"), Branch: q.Get("branch"), Consultancy: q.Get("consultancy"),
-		Country: q.Get("country"), University: q.Get("university"), Status: q.Get("status"),
-	}
-	f := ListFilter{Q: ff.Q, Country: ff.Country}
-	if n, err := strconv.ParseInt(ff.Branch, 10, 16); err == nil {
-		f.BranchID = int16(n)
-	}
-	f.ConsultancyID, _ = strconv.ParseInt(ff.Consultancy, 10, 64)
-	f.UniversityID, _ = strconv.ParseInt(ff.University, 10, 64)
-	if model.ValidOption(model.Statuses, ff.Status) {
-		f.Status = ff.Status
+		Q: q.Get("q"), Branch: q["branch"], Consultancy: q["consultancy"],
+		Country: q["country"], University: q["university"], Status: q["status"],
 	}
 
 	rows, total, err := h.Svc.List(r.Context(), scope, f)

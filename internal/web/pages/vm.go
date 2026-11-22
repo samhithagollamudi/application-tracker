@@ -8,8 +8,10 @@ import (
 
 // ---- students list ----
 
+// Filter forms hold the raw selected values (several per filter).
 type StudentFilterForm struct {
-	Q, Branch, Consultancy, Country, University, Status string
+	Q                                                string
+	Branch, Consultancy, Country, University, Status []string
 }
 
 type StudentsVM struct {
@@ -93,13 +95,20 @@ func plural(n int, one, many string) string {
 // ---- admin: applications ----
 
 type AppFilterForm struct {
-	Q, Branch, Country, University, Status, Intake, Level, Source, Consultancy, From, To string
+	Q, From, To                                                             string
+	Branch, Country, University, Status, Intake, Level, Source, Consultancy []string
 }
 
+// Active counts the filters in use (a multi-select counts once).
 func (f AppFilterForm) Active() int {
 	n := 0
-	for _, v := range []string{f.Q, f.Branch, f.Country, f.University, f.Status, f.Intake, f.Level, f.Source, f.Consultancy, f.From, f.To} {
+	for _, v := range []string{f.Q, f.From, f.To} {
 		if v != "" {
+			n++
+		}
+	}
+	for _, v := range [][]string{f.Branch, f.Country, f.University, f.Status, f.Intake, f.Level, f.Source, f.Consultancy} {
+		if len(v) > 0 {
 			n++
 		}
 	}

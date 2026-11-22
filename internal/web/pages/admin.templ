@@ -34,15 +34,14 @@ templ Applications(vm ApplicationsVM) {
 				Search
 				<input id="q" name="q" type="search" value={ vm.F.Q } placeholder="Student, email, IDs, application no. or university"/>
 			</label>
-			@components.FilterSelect("Branch", "branch", vm.F.Branch, "All branches", vm.Branches)
-			@components.FilterSelect("Country", "country", vm.F.Country, "Any country", vm.Countries)
-			@components.FilterSelect("University", "university", vm.F.University, "Any university", vm.Universities)
-			@components.FilterSelect("Status", "status", vm.F.Status, "Any status", model.Statuses)
-			@components.FilterSelect("Intake", "intake", vm.F.Intake, "Any intake", vm.Intakes)
-			@components.FilterSelect("Programme level", "level", vm.F.Level, "Any level", model.Levels)
-			@components.FilterSelect("Source", "source", vm.F.Source, "Internal + B2B", sourceOptions)
-			@components.FilterSelect("Consultancy", "consultancy", vm.F.Consultancy, "Any consultancy",
-				append([]model.Option{{Value: "none", Label: "Internal only (no consultancy)"}}, vm.Consultancies...))
+			@components.MultiSelect("Branch", "branch", "All branches", vm.Branches, vm.F.Branch)
+			@components.MultiSelect("Country", "country", "Any country", vm.Countries, vm.F.Country)
+			@components.MultiSelect("University", "university", "Any university", vm.Universities, vm.F.University)
+			@components.MultiSelect("Status", "status", "Any status", model.Statuses, vm.F.Status)
+			@components.MultiSelect("Intake", "intake", "Any intake", vm.Intakes, vm.F.Intake)
+			@components.MultiSelect("Programme level", "level", "Any level", model.Levels, vm.F.Level)
+			@components.MultiSelect("Source", "source", "Internal + B2B", sourceOptions, vm.F.Source)
+			@components.MultiSelect("Consultancy", "consultancy", "Any consultancy", append([]model.Option{{Value: "none", Label: "Internal only (no consultancy)"}}, vm.Consultancies...), vm.F.Consultancy)
 			<label class="f">Created from<input type="date" name="from" value={ vm.F.From }/></label>
 			<label class="f">Created to<input type="date" name="to" value={ vm.F.To }/></label>
 			<noscript><button class="btn" type="submit">Apply filters</button></noscript>
@@ -156,7 +155,7 @@ templ Catalog(vm CatalogVM) {
 		<div class="head">
 			<div>
 				<h1>Universities &amp; consultancies</h1>
-				<p class="sub">These are the lists consultants and the agent network see in their dropdowns. Consultancies the agent network types under “Other” are added here and marked. Universities typed under “Other” stay on that one application only.</p>
+				<p class="sub">These are the lists consultants and the agent network see in their dropdowns. Only admins add universities; a university typed under “Other” stays on that one application. Consultancies the agent network types under “Other” are added here and marked.</p>
 			</div>
 		</div>
 		<div class="tabs" role="tablist">
@@ -170,7 +169,7 @@ templ Catalog(vm CatalogVM) {
 						<thead>
 							<tr>
 								if vm.Tab == "universities" {
-									<th>University</th><th>Country</th><th>Added by</th><th>Applications</th><th></th>
+									<th>University</th><th>Country</th><th>Applications</th><th></th>
 								} else {
 									<th>Consultancy</th><th>Added by</th><th>Students</th><th></th>
 								}
@@ -182,7 +181,6 @@ templ Catalog(vm CatalogVM) {
 									<tr>
 										<td class="b">{ r.Name }</td>
 										<td>{ r.Country }</td>
-										<td><span class={ addedByClass(r) }>{ addedBy(r) }</span></td>
 										<td>{ strconv.Itoa(r.Uses) }</td>
 										<td>
 											@catalogDelete(r, "universities")

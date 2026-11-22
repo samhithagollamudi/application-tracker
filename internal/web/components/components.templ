@@ -1,6 +1,11 @@
 package components
 
-import "github.com/ChandraShekar2001/application-tracker/internal/model"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/ChandraShekar2001/application-tracker/internal/model"
+)
 
 // Field is a labelled text-like input. cls adds grid classes ("full", "span2").
 templ Field(label, name, value, typ, placeholder, cls, err string) {
@@ -38,19 +43,6 @@ templ TextArea(label, name, value, cls, err string) {
 		if err != "" {
 			<span class="err">{ err }</span>
 		}
-	</label>
-}
-
-// FilterSelect is a select inside a filter bar ("Any …" as the empty choice).
-templ FilterSelect(label, name, value, anyLabel string, opts []model.Option) {
-	<label class="f">
-		{ label }
-		<select name={ name }>
-			<option value="">{ anyLabel }</option>
-			for _, o := range opts {
-				<option value={ o.Value } selected?={ o.Value == value }>{ o.Label }</option>
-			}
-		</select>
 	</label>
 }
 
@@ -101,5 +93,50 @@ templ KV(label, value string) {
 		<dd>
 			@Dash(value)
 		</dd>
+	</div>
+}
+
+func msSummary(anyLabel string, opts []model.Option, selected []string) string {
+	var picked []string
+	for _, o := range opts {
+		if model.In(o.Value, selected) {
+			picked = append(picked, o.Label)
+		}
+	}
+	switch len(picked) {
+	case 0:
+		return anyLabel
+	case 1, 2:
+		return strings.Join(picked, ", ")
+	default:
+		return fmt.Sprintf("%s +%d", picked[0], len(picked)-1)
+	}
+}
+
+// MultiSelect is a dropdown of checkboxes sending repeated name=value params.
+// Built on <details>, so it opens and submits even without JS; app.js keeps
+// the summary text current, closes it on outside clicks and filters long lists.
+templ MultiSelect(label, name, anyLabel string, opts []model.Option, selected []string) {
+	<div class="f">
+		<span>{ label }</span>
+		<details class="ms" data-ms data-any={ anyLabel }>
+			<summary aria-label={ label + ": " + msSummary(anyLabel, opts, selected) }>
+				<span data-ms-label class={ templ.KV("ms-on", len(selected) > 0) }>{ msSummary(anyLabel, opts, selected) }</span>
+			</summary>
+			<div class="ms-panel">
+				if len(opts) > 8 {
+					<input type="search" class="ms-search" placeholder={ "Find " + strings.ToLower(label) } aria-label={ "Find " + strings.ToLower(label) } data-ms-search/>
+				}
+				for _, o := range opts {
+					<label class="ms-opt">
+						<input type="checkbox" name={ name } value={ o.Value } checked?={ model.In(o.Value, selected) }/>
+						<span>{ o.Label }</span>
+					</label>
+				}
+				if len(opts) == 0 {
+					<span class="small muted" style="padding:8px 12px">Nothing to choose yet</span>
+				}
+			</div>
+		</details>
 	</div>
 }

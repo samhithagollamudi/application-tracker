@@ -128,3 +128,36 @@ document.addEventListener('htmx:configRequest', (e) => {
     if (v === '' || v == null) { if (typeof p.delete === 'function') p.delete(k); else delete p[k]; }
   });
 });
+
+// ---- Multi-select filters ----
+(function () {
+  const summary = (ms) => {
+    const picked = [...ms.querySelectorAll('input[type=checkbox]:checked')]
+      .map((c) => c.closest('.ms-opt').textContent.trim());
+    const el = ms.querySelector('[data-ms-label]');
+    el.textContent = picked.length === 0 ? ms.dataset.any
+      : picked.length <= 2 ? picked.join(', ') : picked[0] + ' +' + (picked.length - 1);
+    el.classList.toggle('ms-on', picked.length > 0);
+  };
+  document.addEventListener('change', (e) => {
+    const ms = e.target.closest('[data-ms]');
+    if (ms && e.target.type === 'checkbox') summary(ms);
+  });
+  // One open at a time; close on outside click or Escape.
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('details[data-ms][open]').forEach((d) => {
+      if (!d.contains(e.target)) d.open = false;
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('details[data-ms][open]').forEach((d) => { d.open = false; });
+  });
+  // Type-to-find inside long lists.
+  document.addEventListener('input', (e) => {
+    if (!e.target.matches('[data-ms-search]')) return;
+    const q = e.target.value.trim().toLowerCase();
+    e.target.closest('.ms-panel').querySelectorAll('.ms-opt').forEach((o) => {
+      o.hidden = q !== '' && !o.textContent.toLowerCase().includes(q);
+    });
+  });
+})();

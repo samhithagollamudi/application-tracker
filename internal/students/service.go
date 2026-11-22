@@ -89,14 +89,14 @@ func get(ctx context.Context, db gen.DBTX, scope access.Scope, id int64, forUpda
 	return s, err
 }
 
-// ListFilter: zero values mean "any".
+// ListFilter: empty lists mean "any"; several values match any of them.
 type ListFilter struct {
-	Q             string
-	BranchID      int16
-	ConsultancyID int64
-	Country       string
-	UniversityID  int64
-	Status        string
+	Q              string
+	BranchIDs      []int16
+	ConsultancyIDs []int64
+	Countries      []string
+	UniversityIDs  []int64
+	Statuses       []string // a student matches if ANY of their applications has one of these
 }
 
 const listLimit = 500
@@ -114,21 +114,21 @@ func (sv *Service) List(ctx context.Context, scope access.Scope, f ListFilter) (
 		}
 		where = append(where, cond+`)`)
 	}
-	if f.BranchID != 0 {
-		where = append(where, `s.branch_id = `+args.Add(f.BranchID))
+	if len(f.BranchIDs) > 0 {
+		where = append(where, `s.branch_id = ANY(`+args.Add(f.BranchIDs)+`)`)
 	}
-	if f.ConsultancyID != 0 {
-		where = append(where, `s.consultancy_id = `+args.Add(f.ConsultancyID))
+	if len(f.ConsultancyIDs) > 0 {
+		where = append(where, `s.consultancy_id = ANY(`+args.Add(f.ConsultancyIDs)+`)`)
 	}
-	if f.Country != "" {
+	if len(f.Countries) > 0 {
 		where = append(where, `EXISTS (SELECT 1 FROM applications a LEFT JOIN universities un ON un.id = a.university_id
-			WHERE a.student_id = s.id AND coalesce(un.country, a.custom_university_country) = `+args.Add(f.Country)+`)`)
+			WHERE a.student_id = s.id AND coalesce(un.country, a.custom_university_country) = ANY(`+args.Add(f.Countries)+`))`)
 	}
-	if f.UniversityID != 0 {
-		where = append(where, `EXISTS (SELECT 1 FROM applications a WHERE a.student_id = s.id AND a.university_id = `+args.Add(f.UniversityID)+`)`)
+	if len(f.UniversityIDs) > 0 {
+		where = append(where, `EXISTS (SELECT 1 FROM applications a WHERE a.student_id = s.id AND a.university_id = ANY(`+args.Add(f.UniversityIDs)+`))`)
 	}
-	if f.Status != "" {
-		where = append(where, `EXISTS (SELECT 1 FROM applications a WHERE a.student_id = s.id AND a.status = `+args.Add(f.Status)+`)`)
+	if len(f.Statuses) > 0 {
+		where = append(where, `EXISTS (SELECT 1 FROM applications a WHERE a.student_id = s.id AND a.status = ANY(`+args.Add(f.Statuses)+`))`)
 	}
 
 	sql := `SELECT s.id, coalesce(s.first_name,''), coalesce(s.family_name,''), s.email::text, s.source,

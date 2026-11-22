@@ -36,14 +36,14 @@ templ Students(vm StudentsVM) {
 				<input id="q" name="q" type="search" value={ vm.F.Q } placeholder="Name, email, student ID or application number"/>
 			</label>
 			if vm.ShowBranch {
-				@components.FilterSelect("Branch", "branch", vm.F.Branch, "All branches", vm.Branches)
+				@components.MultiSelect("Branch", "branch", "All branches", vm.Branches, vm.F.Branch)
 			}
 			if vm.ShowConsultancy {
-				@components.FilterSelect("Consultancy", "consultancy", vm.F.Consultancy, "Any consultancy", vm.Consultancies)
+				@components.MultiSelect("Consultancy", "consultancy", "Any consultancy", vm.Consultancies, vm.F.Consultancy)
 			}
-			@components.FilterSelect("Country", "country", vm.F.Country, "Any country", vm.Countries)
-			@components.FilterSelect("University", "university", vm.F.University, "Any university", vm.Universities)
-			@components.FilterSelect("Status (any application)", "status", vm.F.Status, "Any status", model.Statuses)
+			@components.MultiSelect("Country", "country", "Any country", vm.Countries, vm.F.Country)
+			@components.MultiSelect("University", "university", "Any university", vm.Universities, vm.F.University)
+			@components.MultiSelect("Status (any application)", "status", "Any status", model.Statuses, vm.F.Status)
 			<noscript><button class="btn" type="submit">Apply filters</button></noscript>
 		</form>
 		@studentResults(vm)
