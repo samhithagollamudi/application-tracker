@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ChandraShekar2001/application-tracker/internal/access"
+	"github.com/ChandraShekar2001/application-tracker/internal/db/gen"
 	"github.com/ChandraShekar2001/application-tracker/internal/model"
 )
 
@@ -146,10 +147,9 @@ type Stats struct {
 	Total, Waiting, Admitted, B2B int
 }
 
-const pageLimit = 200
-
-// Search returns up to 200 rows (most recently updated first) and stats over all matches.
-func (s *Service) Search(ctx context.Context, scope access.Scope, f Filter) ([]model.AppRow, Stats, error) {
+// Search returns one page of rows (most recently updated first), stats over
+// all matches, and the page with its total filled in.
+func (s *Service) Search(ctx context.Context, scope access.Scope, f Filter, page model.Page) ([]model.AppRow, Stats, model.Page, error) {
 	var st Stats
 	var args access.Args
 	w := where(scope, f, &args)
@@ -159,18 +159,21 @@ func (s *Service) Search(ctx context.Context, scope access.Scope, f Filter) ([]m
 		count(*) FILTER (WHERE s.source = 'b2b')`+fromSQL+` WHERE `+w, args.Values()...).
 		Scan(&st.Total, &st.Waiting, &st.Admitted, &st.B2B)
 	if err != nil {
-		return nil, st, err
+		return nil, st, page, err
+	}
+	page = page.WithTotal(st.Total)
+	if st.Total == 0 {
+		return nil, st, page, nil
 	}
 
-	args = access.Args{}
-	w = where(scope, f, &args)
+	lim, off := args.Add(page.Size), args.Add(page.Offset())
 	rows, err := s.pool.Query(ctx, `SELECT a.id, s.id, coalesce(s.first_name,''), coalesce(s.family_name,''), s.email::text,
 		coalesce(u.name, a.custom_university_name, ''), coalesce(u.country, a.custom_university_country, ''), a.university_id IS NULL,
 		coalesce(a.programme, ''), coalesce(a.programme_level, ''), coalesce(a.intake, ''), coalesce(a.year::text, ''),
 		coalesce(b.name, ''), coalesce(c.name, ''), o.name, coalesce(a.status, ''), a.updated_at`+fromSQL+
-		` WHERE `+w+` ORDER BY a.updated_at DESC, a.id DESC LIMIT `+strconv.Itoa(pageLimit), args.Values()...)
+		` WHERE `+w+` ORDER BY a.updated_at DESC, a.id DESC LIMIT `+lim+` OFFSET `+off, args.Values()...)
 	if err != nil {
-		return nil, st, err
+		return nil, st, page, err
 	}
 	defer rows.Close()
 	var out []model.AppRow
@@ -179,11 +182,11 @@ func (s *Service) Search(ctx context.Context, scope access.Scope, f Filter) ([]m
 		if err := rows.Scan(&r.ID, &r.StudentID, &r.FirstName, &r.FamilyName, &r.Email, &r.Uni, &r.Country, &r.Custom,
 			&r.Programme, &r.Level, &r.Intake, &r.Year, &r.BranchName, &r.ConsultancyName, &r.OwnerName,
 			&r.Status, &r.UpdatedAt); err != nil {
-			return nil, st, err
+			return nil, st, page, err
 		}
 		out = append(out, r)
 	}
-	return out, st, rows.Err()
+	return out, st, page, rows.Err()
 }
 
 // IntakeOptions lists the intake/year combinations in use, e.g. "Autumn 2027".
@@ -205,4 +208,13 @@ func (s *Service) IntakeOptions(ctx context.Context) ([]model.Option, error) {
 		out = append(out, model.Option{Value: in + "-" + ys, Label: model.IntakeLabel(in) + " " + ys})
 	}
 	return out, rows.Err()
+}
+
+// Count returns how many applications match f (used to decide whether an
+// export can stream straight away or must run in the background).
+func Count(ctx context.Context, db gen.DBTX, scope access.Scope, f Filter) (int, error) {
+	var args access.Args
+	var n int
+	err := db.QueryRow(ctx, `SELECT count(*)`+fromSQL+` WHERE `+where(scope, f, &args), args.Values()...).Scan(&n)
+	return n, err
 }

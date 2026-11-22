@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ChandraShekar2001/application-tracker/internal/model"
 )
@@ -20,7 +21,8 @@ type StudentsVM struct {
 	ShowBranch      bool
 	ShowConsultancy bool
 	Rows            []model.StudentRow
-	Total           int
+	Page            model.Page
+	Query           string // current filters as a query string, without "page"
 	F               StudentFilterForm
 	Branches        []model.Option
 	Consultancies   []model.Option
@@ -126,7 +128,9 @@ type ApplicationsVM struct {
 	Universities  []model.Option
 	Intakes       []model.Option
 	Consultancies []model.Option
-	ExportHref    string
+	Page          model.Page
+	Query         string // current filters as a query string, without "page"
+	DirectLimit   int    // larger exports run in the background
 }
 
 func studentFromApps(id int64) string { return fmt.Sprintf("/students/%d?from=applications", id) }
@@ -173,4 +177,36 @@ type UsersVM struct {
 	Form         UserForm
 	DBSize       string
 	MeID         int64
+}
+
+// ---- admin: exports ----
+
+type ExportRow struct {
+	ID       int64
+	Status   string // queued | running | done | failed
+	Total    int
+	Done     int
+	FileName string
+	Size     int64
+	Error    string
+	Created  time.Time
+	Query    string
+}
+
+func (e ExportRow) Percent() int {
+	if e.Total == 0 {
+		return 0
+	}
+	return e.Done * 100 / e.Total
+}
+
+type ExportsVM struct {
+	Rows       []ExportRow
+	AnyPending bool
+}
+
+type ExportNotice struct {
+	ID   int64
+	OK   bool
+	Rows int
 }

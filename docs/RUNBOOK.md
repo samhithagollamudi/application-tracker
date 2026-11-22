@@ -85,10 +85,17 @@ The script refuses a non-empty target unless `FORCE=1`.
 - **Student in the wrong branch**: open the student (admin) → Move to branch. The owner becomes that branch's consultant.
 - **Duplicate/typo in a list**: entries can be removed only while unused.
 
+## Exports
+
+- Up to 5,000 rows: the CSV downloads immediately.
+- More than that: the export runs in the background (2 workers). The admin keeps working and gets a notice with a Download link; the **Exports** page lists the last 20 with progress. Files are stored gzip-compressed in the `exports` table and deleted after 24 hours (a 200,000-row export is ~49 MB of CSV, ~3.6 MB stored).
+- A deploy/restart while an export runs is safe: it is queued again and rebuilt on startup.
+- Each file is read from one consistent database snapshot, so rows edited during the export are never duplicated or skipped.
+
 ## Logs and monitoring
 
 - Logs are JSON (`slog`) with a request ID per request (`X-Request-ID` response header). Only method, path, status and timing are logged — never query strings or form bodies, so student data stays out of logs.
-- `csv export` lines record who exported and how many rows.
+- `csv export` / `csv export queued` / `csv export ready` lines record who exported, how many rows and how long it took.
 - Database size is shown at the bottom of **Users & branches**.
 
 ## Security notes

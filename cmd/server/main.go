@@ -123,7 +123,7 @@ func createAdmin(ctx context.Context, pool *pgxpool.Pool, args []string) error {
 func serve(ctx context.Context, log *slog.Logger, cfg config.Config, pool *pgxpool.Pool) error {
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           server.New(server.Deps{Cfg: cfg, Pool: pool, Log: log}),
+		Handler:           server.New(server.Deps{Cfg: cfg, Pool: pool, Log: log, Ctx: ctx}),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      5 * time.Minute, // CSV export streams large files

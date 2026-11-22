@@ -17,9 +17,10 @@ import (
 )
 
 type Handlers struct {
-	Svc  *Service
-	Cat  *catalog.Service
-	Auth *auth.Manager
+	Svc               *Service
+	Cat               *catalog.Service
+	Auth              *auth.Manager
+	ExportDirectLimit int // shown on the export button: larger exports run in the background
 }
 
 func pathID(r *http.Request) (int64, bool) {
@@ -234,7 +235,7 @@ func (h *Handlers) AdminList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	q := r.URL.Query()
 	f := ParseFilter(q)
-	rows, st, err := h.Svc.Search(ctx, access.ScopeOf(reqctx.User(ctx)), f)
+	rows, st, page, err := h.Svc.Search(ctx, access.ScopeOf(reqctx.User(ctx)), f, model.ParsePage(q.Get("page")))
 	if err != nil {
 		web.ServerError(w, r, err)
 		return
@@ -247,10 +248,9 @@ func (h *Handlers) AdminList(w http.ResponseWriter, r *http.Request) {
 			Status: q["status"], Intake: q["intake"], Level: q["level"], Source: q["source"],
 			Consultancy: q["consultancy"], From: q.Get("from"), To: q.Get("to"),
 		},
-		ExportHref: "/applications/export.csv",
-	}
-	if e := r.URL.RawQuery; e != "" {
-		vm.ExportHref += "?" + e
+		Page:        page,
+		Query:       model.QueryWithout(q, "page"),
+		DirectLimit: h.ExportDirectLimit,
 	}
 	for _, load := range []struct {
 		dst *[]model.Option

@@ -1,23 +1,26 @@
-// Package export streams the admin's filtered applications as CSV, one row
+// Package export produces the admin's filtered applications as CSV, one row
 // per application, columns following the form.
+//
+// Small exports (up to DirectLimit rows) stream straight to the browser.
+// Larger ones run as background jobs (see runner.go): the admin keeps working
+// and gets a notice with a download link when the file is ready.
 package export
 
 import (
+	"context"
 	"encoding/csv"
-	"log/slog"
-	"net/http"
+	"io"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/ChandraShekar2001/application-tracker/internal/access"
 	"github.com/ChandraShekar2001/application-tracker/internal/applications"
-	"github.com/ChandraShekar2001/application-tracker/internal/httpx"
+	"github.com/ChandraShekar2001/application-tracker/internal/db/gen"
 	"github.com/ChandraShekar2001/application-tracker/internal/model"
-	"github.com/ChandraShekar2001/application-tracker/internal/reqctx"
-	"github.com/ChandraShekar2001/application-tracker/internal/web"
 )
+
+// DefaultDirectLimit is the largest export streamed immediately.
+const DefaultDirectLimit = 5000
 
 var header = []string{
 	"Application ID", "Branch", "Owner", "Consultancy",
@@ -44,11 +47,6 @@ const columns = `a.id, coalesce(b.name, ''), o.name, coalesce(c.name, ''),
 	coalesce(a.personal_code, ''), coalesce(a.tuition_fee::text, ''), coalesce(a.tuition_currency, ''), coalesce(a.tuition_per, ''), coalesce(a.scholarship, ''),
 	a.created_at, a.updated_at`
 
-type Handler struct {
-	Pool *pgxpool.Pool
-	Log  *slog.Logger
-}
-
 // safe stops spreadsheet apps from treating a cell as a formula.
 func safe(v string) string {
 	if v != "" && strings.ContainsRune("=+-@\t\r", rune(v[0])) {
@@ -57,29 +55,32 @@ func safe(v string) string {
 	return v
 }
 
-func (h *Handler) CSV(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	u := reqctx.User(ctx)
-	f := applications.ParseFilter(r.URL.Query())
+// FileName is the download name, dated in IST.
+func FileName(t time.Time) string {
+	return "applications-" + t.In(model.IST).Format("2006-01-02") + ".csv"
+}
+
+// Write streams the matching applications as CSV (UTF-8 BOM + header + rows)
+// in a single query, so memory stays flat whatever the row count. flush is
+// called every 500 rows (may be nil); progress after every row (may be nil).
+func Write(ctx context.Context, db gen.DBTX, scope access.Scope, f applications.Filter, w io.Writer,
+	flush func(), progress func(n int)) (int, error) {
 	var args access.Args
-	sql := `SELECT ` + columns + applications.FromSQL + ` WHERE ` + applications.Where(access.ScopeOf(u), f, &args) +
+	sql := `SELECT ` + columns + applications.FromSQL + ` WHERE ` + applications.Where(scope, f, &args) +
 		` ORDER BY a.updated_at DESC, a.id DESC`
-	rows, err := h.Pool.Query(ctx, sql, args.Values()...)
+	rows, err := db.Query(ctx, sql, args.Values()...)
 	if err != nil {
-		web.ServerError(w, r, err)
-		return
+		return 0, err
 	}
 	defer rows.Close()
 
-	name := "applications-" + time.Now().In(model.IST).Format("2006-01-02") + ".csv"
-	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte("\uFEFF")) // BOM so Excel reads UTF-8 names correctly
-
-	rc := http.NewResponseController(w)
+	if _, err := w.Write([]byte("\uFEFF")); err != nil { // BOM so Excel reads UTF-8 names correctly
+		return 0, err
+	}
 	cw := csv.NewWriter(w)
-	_ = cw.Write(header)
+	if err := cw.Write(header); err != nil {
+		return 0, err
+	}
 
 	n := 0
 	for rows.Next() {
@@ -96,7 +97,7 @@ func (h *Handler) CSV(w http.ResponseWriter, r *http.Request) {
 			&bau, &bas, &bad, &bag, &mau, &mas, &mad, &mag, &xb, &xs, &xg,
 			&uni, &country, &custom, &level, &prog, &prio, &intake, &year, &appNo, &sub, &status,
 			&pcode, &fee, &cur, &per, &sch, &created, &updated); err != nil {
-			h.abort(r, err)
+			return n, err
 		}
 		oneOff, statusLabel := "", ""
 		if custom {
@@ -118,24 +119,25 @@ func (h *Handler) CSV(w http.ResponseWriter, r *http.Request) {
 			rec[i] = safe(rec[i])
 		}
 		if err := cw.Write(rec); err != nil {
-			return // client went away
+			return n, err
 		}
 		n++
+		if progress != nil {
+			progress(n)
+		}
 		if n%500 == 0 {
 			cw.Flush()
-			_ = rc.Flush()
+			if err := cw.Error(); err != nil {
+				return n, err
+			}
+			if flush != nil {
+				flush()
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
-		h.abort(r, err)
+		return n, err
 	}
 	cw.Flush()
-	h.Log.Info("csv export", "id", httpx.RequestID(ctx), "user_id", u.ID, "rows", n)
-}
-
-// abort kills the connection mid-stream so a failed export can't be
-// mistaken for a complete (but truncated) file.
-func (h *Handler) abort(r *http.Request, err error) {
-	h.Log.Error("csv export failed", "id", httpx.RequestID(r.Context()), "err", err)
-	panic(http.ErrAbortHandler)
+	return n, cw.Error()
 }

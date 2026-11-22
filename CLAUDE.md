@@ -37,6 +37,8 @@ go vet ./... && staticcheck ./...
 - **No inline JS.** The CSP is `script-src 'self'`, so behaviour goes in `internal/web/static/app.js` (data-attributes such as `data-confirm` and `data-copy`). Every POST form needs `@layout.CSRF()`; htmx sends the token via the `X-CSRF-Token` header.
 - Never log student data. Request logs record method, path and status only.
 - Only the student's email is required (unique, case- and space-insensitive). "Other" universities stay on that one application and are never added to the list. "Other" consultancies typed by the agent network ARE added to the list.
+- **Lists are paged** (50 per page, `model.Page`, `?page=N`): count first, then fetch only that page. Per-row extras (student app counts, universities, latest status) are computed only for the page's rows via a CTE. Keep it that way; the target is 1 lakh+ students.
+- **Exports**: `POST /applications/export` streams immediately up to `export.DefaultDirectLimit` (5,000) rows; above that it creates a row in `exports` and `export.Runner` builds the file in the background from one repeatable-read snapshot (gzip in the DB, deleted after 24 h, requeued after a restart). Admin pages poll `/exports/notify` (htmx; status 286 stops polling) to show the "ready" notice. Measured locally: 200,000 rows in ~0.7 s.
 - Roles: `admin` (everything), `consultant` (internal students of their own branch, one active consultant per branch), `agent_network` (all B2B students).
 
 ## Working preferences (from the repo owner)

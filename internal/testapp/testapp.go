@@ -32,15 +32,26 @@ type App struct {
 // Password is the password of every user created with CreateUser.
 const Password = "correct-horse-battery"
 
-func New(t testing.TB) *App {
+// Option tweaks the server under test.
+type Option func(*server.Deps)
+
+// WithExportDirectLimit makes exports above n rows run in the background.
+func WithExportDirectLimit(n int) Option { return func(d *server.Deps) { d.ExportDirectLimit = n } }
+
+func New(t testing.TB, opts ...Option) *App {
 	t.Helper()
 	pool := dbtest.New(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := httptest.NewServer(server.New(server.Deps{
+	deps := server.Deps{
 		Cfg:  config.Config{Env: "development"},
 		Pool: pool,
 		Log:  log,
-	}))
+		Ctx:  t.Context(),
+	}
+	for _, o := range opts {
+		o(&deps)
+	}
+	srv := httptest.NewServer(server.New(deps))
 	t.Cleanup(srv.Close)
 	h, err := auth.HashPassword(Password)
 	if err != nil {

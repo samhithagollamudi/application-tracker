@@ -99,10 +99,9 @@ type ListFilter struct {
 	Statuses       []string // a student matches if ANY of their applications has one of these
 }
 
-const listLimit = 500
-
-// List returns matching students (most recently updated first, capped) and the total count.
-func (sv *Service) List(ctx context.Context, scope access.Scope, f ListFilter) ([]model.StudentRow, int, error) {
+// List returns one page of matching students (most recently updated first)
+// and the page with its total filled in.
+func (sv *Service) List(ctx context.Context, scope access.Scope, f ListFilter, page model.Page) ([]model.StudentRow, model.Page, error) {
 	var args access.Args
 	where := []string{access.StudentFilter(scope, "s", &args)}
 	if q := strings.TrimSpace(f.Q); q != "" {
@@ -131,36 +130,50 @@ func (sv *Service) List(ctx context.Context, scope access.Scope, f ListFilter) (
 		where = append(where, `EXISTS (SELECT 1 FROM applications a WHERE a.student_id = s.id AND a.status = ANY(`+args.Add(f.Statuses)+`))`)
 	}
 
-	sql := `SELECT s.id, coalesce(s.first_name,''), coalesce(s.family_name,''), s.email::text, s.source,
+	cond := strings.Join(where, " AND ")
+
+	var total int
+	if err := sv.pool.QueryRow(ctx, `SELECT count(*) FROM students s WHERE `+cond, args.Values()...).Scan(&total); err != nil {
+		return nil, page, err
+	}
+	page = page.WithTotal(total)
+	if total == 0 {
+		return nil, page, nil
+	}
+
+	// Pick the page's ids first, then compute the per-student extras for those rows only.
+	lim, off := args.Add(page.Size), args.Add(page.Offset())
+	sql := `WITH pg AS (
+			SELECT s.id FROM students s WHERE ` + cond + `
+			ORDER BY s.updated_at DESC, s.id DESC LIMIT ` + lim + ` OFFSET ` + off + `
+		)
+		SELECT s.id, coalesce(s.first_name,''), coalesce(s.family_name,''), s.email::text, s.source,
 		coalesce(b.name,''), coalesce(c.name,''),
 		(SELECT count(*) FROM applications a WHERE a.student_id = s.id),
 		coalesce((SELECT string_agg(coalesce(un.name, a.custom_university_name), ', ' ORDER BY a.created_at)
 			FROM applications a LEFT JOIN universities un ON un.id = a.university_id WHERE a.student_id = s.id), ''),
 		(SELECT coalesce(a.status, '') FROM applications a WHERE a.student_id = s.id ORDER BY a.updated_at DESC, a.id DESC LIMIT 1),
-		s.updated_at, count(*) OVER ()
-		FROM students s
+		s.updated_at
+		FROM pg JOIN students s ON s.id = pg.id
 		LEFT JOIN branches b ON b.id = s.branch_id
 		LEFT JOIN consultancies c ON c.id = s.consultancy_id
-		WHERE ` + strings.Join(where, " AND ") + `
-		ORDER BY s.updated_at DESC, s.id DESC
-		LIMIT ` + fmt.Sprint(listLimit)
+		ORDER BY s.updated_at DESC, s.id DESC`
 
 	rows, err := sv.pool.Query(ctx, sql, args.Values()...)
 	if err != nil {
-		return nil, 0, err
+		return nil, page, err
 	}
 	defer rows.Close()
 	var out []model.StudentRow
-	total := 0
 	for rows.Next() {
 		var r model.StudentRow
 		if err := rows.Scan(&r.ID, &r.FirstName, &r.FamilyName, &r.Email, &r.Source, &r.BranchName,
-			&r.ConsultancyName, &r.AppCount, &r.Universities, &r.LatestStatus, &r.UpdatedAt, &total); err != nil {
-			return nil, 0, err
+			&r.ConsultancyName, &r.AppCount, &r.Universities, &r.LatestStatus, &r.UpdatedAt); err != nil {
+			return nil, page, err
 		}
 		out = append(out, r)
 	}
-	return out, total, rows.Err()
+	return out, page, rows.Err()
 }
 
 func escapeLike(s string) string {

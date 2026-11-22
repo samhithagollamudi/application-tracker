@@ -49,7 +49,7 @@ func TestAdminApplicationsFilters(t *testing.T) {
 		}
 	}
 	// The export link carries the same filters.
-	if b := w.admin.Get("/applications?status=admitted").Body; !strings.Contains(b, `href="/applications/export.csv?status=admitted"`) {
+	if b := w.admin.Get("/applications?status=admitted").Body; !strings.Contains(b, `name="query" value="status=admitted"`) {
 		t.Error("export link doesn't carry the filters")
 	}
 }

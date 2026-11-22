@@ -11,11 +11,19 @@ import (
 )
 
 // registerAdmin mounts admin-only tools. Everything here is behind RequireRole(admin).
-func registerAdmin(app *http.ServeMux, am *auth.Manager, d Deps, cat *catalog.Service, ah *applications.Handlers, admin func(http.Handler) http.Handler) {
+func registerAdmin(app *http.ServeMux, am *auth.Manager, d Deps, cat *catalog.Service, ah *applications.Handlers, admin func(http.Handler) http.Handler, exportLimit int) {
 	a := func(f http.HandlerFunc) http.Handler { return admin(f) }
 
 	app.Handle("GET /applications", a(ah.AdminList))
-	app.Handle("GET /applications/export.csv", a((&export.Handler{Pool: d.Pool, Log: d.Log}).CSV))
+	runner := export.NewRunner(d.Pool, d.Log)
+	if d.Ctx != nil {
+		runner.Start(d.Ctx)
+	}
+	eh := &export.Handler{Pool: d.Pool, Log: d.Log, Auth: am, Runner: runner, DirectLimit: exportLimit}
+	app.Handle("POST /applications/export", a(eh.Start))
+	app.Handle("GET /exports", a(eh.List))
+	app.Handle("GET /exports/notify", a(eh.Notify))
+	app.Handle("GET /exports/{id}/download", a(eh.Download))
 
 	ch := &catalog.AdminHandlers{Svc: cat, Auth: am}
 	app.Handle("GET /admin/catalog", a(ch.Page))

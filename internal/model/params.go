@@ -1,6 +1,9 @@
 package model
 
-import "strconv"
+import (
+	"net/url"
+	"strconv"
+)
 
 // Int16s parses the valid integers from repeated query values (dupes dropped).
 func Int16s(vals []string) []int16 {
@@ -62,3 +65,16 @@ func In(v string, vals []string) bool {
 	}
 	return false
 }
+
+// QueryWithout encodes q without the given keys (e.g. drop "page" for pager links).
+func QueryWithout(q map[string][]string, keys ...string) string {
+	c := make(map[string][]string, len(q))
+	for k, v := range q {
+		if !In(k, keys) {
+			c[k] = v
+		}
+	}
+	return encodeSorted(c)
+}
+
+func encodeSorted(m map[string][]string) string { return url.Values(m).Encode() }

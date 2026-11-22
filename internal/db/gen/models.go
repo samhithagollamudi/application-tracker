@@ -55,6 +55,22 @@ type Consultancy struct {
 	CreatedAt time.Time
 }
 
+type Export struct {
+	ID         int64
+	UserID     int64
+	Query      string
+	Status     string
+	TotalRows  int32
+	DoneRows   int32
+	File       []byte
+	FileName   *string
+	FileSize   *int64
+	Error      *string
+	Notified   bool
+	CreatedAt  time.Time
+	FinishedAt *time.Time
+}
+
 type Session struct {
 	Token  string
 	Data   []byte

@@ -16,7 +16,7 @@ func TestCSVExport(t *testing.T) {
 		"email": {"priya@example.com"}, "first_name": {"=HYPERLINK(\"http://evil\")"}, "family_name": {"Rao"},
 	})
 
-	r := w.admin.Get("/applications/export.csv")
+	r := w.admin.Post("/applications/export", url.Values{"query": {""}})
 	if r.Status != http.StatusOK || !strings.HasPrefix(r.Header.Get("Content-Type"), "text/csv") {
 		t.Fatalf("export: %d %s", r.Status, r.Header.Get("Content-Type"))
 	}
@@ -64,17 +64,17 @@ func TestCSVExport(t *testing.T) {
 	}
 
 	// Filters apply to the export exactly as on screen.
-	r = w.admin.Get("/applications/export.csv?source=b2b")
+	r = w.admin.Post("/applications/export", url.Values{"query": {"source=b2b"}})
 	recs, _ = csv.NewReader(strings.NewReader(strings.TrimPrefix(r.Body, "\uFEFF"))).ReadAll()
 	if len(recs) != 2 || recs[1][col("Application email")] != "kavya@example.com" {
 		t.Fatalf("filtered export wrong: %v", recs)
 	}
 
 	// Only admins can export.
-	if r := w.chennai.Get("/applications/export.csv"); r.Status != http.StatusNotFound {
+	if r := w.chennai.Post("/applications/export", nil); r.Status != http.StatusNotFound {
 		t.Fatalf("consultant export: %d", r.Status)
 	}
-	if r := w.agent.Get("/applications/export.csv"); r.Status != http.StatusNotFound {
+	if r := w.agent.Post("/applications/export", nil); r.Status != http.StatusNotFound {
 		t.Fatalf("agent export: %d", r.Status)
 	}
 }

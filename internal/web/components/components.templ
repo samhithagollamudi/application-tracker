@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ChandraShekar2001/application-tracker/internal/model"
@@ -139,4 +140,73 @@ templ MultiSelect(label, name, anyLabel string, opts []model.Option, selected []
 			</div>
 		</details>
 	</div>
+}
+
+func pageHref(path, base string, n int) string {
+	q := base
+	if n > 1 {
+		if q != "" {
+			q += "&"
+		}
+		q += "page=" + strconv.Itoa(n)
+	}
+	if q == "" {
+		return path
+	}
+	return path + "?" + q
+}
+
+// Pager is the footer of a paged list: "51–100 of 12,345" plus page links.
+// Links swap just the #results region (and update the URL); without JS they
+// are plain links. base is the current query string without "page".
+templ Pager(p model.Page, noun, nouns, path, base string) {
+	<div class="pager">
+		<span class="small muted">
+			if p.Total == 0 {
+				No { nouns }
+			} else if p.Pages() == 1 {
+				{ model.Thousands(p.Total) } { pick(p.Total == 1, noun, nouns) }
+			} else {
+				{ model.Thousands(p.From()) }–{ model.Thousands(p.To()) } of { model.Thousands(p.Total) } { nouns }
+			}
+		</span>
+		if p.Pages() > 1 {
+			<nav class="pages" aria-label="Pages">
+				@pageLink(p.Number > 1, pageHref(path, base, p.Number-1), "‹ Prev", false)
+				for _, n := range p.Window() {
+					if n == 0 {
+						<span class="gap">…</span>
+					} else {
+						@pageLink(n != p.Number, pageHref(path, base, n), strconv.Itoa(n), n == p.Number)
+					}
+				}
+				@pageLink(p.Number < p.Pages(), pageHref(path, base, p.Number+1), "Next ›", false)
+			</nav>
+		}
+	</div>
+}
+
+templ pageLink(enabled bool, href, text string, current bool) {
+	if current {
+		<span class="pg on" aria-current="page">{ text }</span>
+	} else if enabled {
+		<a
+			class="pg"
+			href={ templ.SafeURL(href) }
+			hx-get={ href }
+			hx-target="#results"
+			hx-select="#results"
+			hx-swap="outerHTML show:#results:top"
+			hx-push-url="true"
+		>{ text }</a>
+	} else {
+		<span class="pg off">{ text }</span>
+	}
+}
+
+func pick(c bool, a, b string) string {
+	if c {
+		return a
+	}
+	return b
 }

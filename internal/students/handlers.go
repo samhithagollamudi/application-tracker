@@ -52,12 +52,12 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		Country: q["country"], University: q["university"], Status: q["status"],
 	}
 
-	rows, total, err := h.Svc.List(r.Context(), scope, f)
+	rows, page, err := h.Svc.List(r.Context(), scope, f, model.ParsePage(q.Get("page")))
 	if err != nil {
 		web.ServerError(w, r, err)
 		return
 	}
-	vm := pages.StudentsVM{Rows: rows, Total: total, F: ff, CanCreate: scope.CanCreateStudents()}
+	vm := pages.StudentsVM{Rows: rows, Page: page, Query: model.QueryWithout(q, "page"), F: ff, CanCreate: scope.CanCreateStudents()}
 	switch u.Role {
 	case model.RoleAdmin:
 		vm.Title, vm.Subtitle = "Students", "Every student across all branches, internal and B2B."

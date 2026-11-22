@@ -59,7 +59,7 @@ func TestMultiValueFilters(t *testing.T) {
 	}
 
 	// CSV export honours several values too.
-	r := w.admin.Get("/applications/export.csv?status=applied&status=admitted")
+	r := w.admin.Post("/applications/export", url.Values{"query": {"status=applied&status=admitted"}})
 	recs, err := csv.NewReader(strings.NewReader(strings.TrimPrefix(r.Body, "\uFEFF"))).ReadAll()
 	if err != nil || len(recs) != 3 {
 		t.Fatalf("multi-status export: %d rows (%v), want header + 2", len(recs), err)

@@ -1,0 +1,104 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/ChandraShekar2001/application-tracker/internal/model"
+	"github.com/ChandraShekar2001/application-tracker/internal/web/layout"
+)
+
+func humanSize(n int64) string {
+	switch {
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%d KB", n>>10)
+	}
+	return fmt.Sprintf("%d B", n)
+}
+
+func filtersHref(q string) string {
+	if q == "" {
+		return "/applications"
+	}
+	return "/applications?" + q
+}
+
+// Exports lists the admin's recent exports. While any is still running the
+// table refreshes itself every few seconds.
+templ Exports(vm ExportsVM) {
+	@layout.Page("Exports", "exports") {
+		<div class="head">
+			<div>
+				<h1>Exports</h1>
+				<p class="sub">Large exports are prepared in the background. Files are kept for 24 hours.</p>
+			</div>
+		</div>
+		<div
+			class="tbl"
+			id="exports"
+			if vm.AnyPending {
+				hx-get="/exports"
+				hx-trigger="every 3s"
+				hx-select="#exports"
+				hx-target="#exports"
+				hx-swap="outerHTML"
+			}
+		>
+			<div class="scroll">
+				<table>
+					<thead><tr><th>Requested</th><th>Applications</th><th>Status</th><th>File</th><th>Filters</th></tr></thead>
+					<tbody>
+						for _, e := range vm.Rows {
+							<tr>
+								<td class="muted">{ e.Created.In(model.IST).Format("02 Jan 2006, 15:04") }</td>
+								<td class="b">{ model.Thousands(e.Total) }</td>
+								<td>
+									switch e.Status {
+										case "done":
+											<span class="badge s-admitted">Ready</span>
+										case "failed":
+											<span class="badge s-rejected" title={ e.Error }>Failed</span>
+										case "running":
+											<span class="badge s-applied">Preparing { strconv.Itoa(e.Percent()) }%</span>
+											<div class="progress"><span style={ fmt.Sprintf("width:%d%%", e.Percent()) }></span></div>
+										default:
+											<span class="badge s-none">Waiting</span>
+									}
+								</td>
+								<td>
+									if e.Status == "done" {
+										<a class="btn sm blue" href={ templ.SafeURL(fmt.Sprintf("/exports/%d/download", e.ID)) }>Download</a>
+										<span class="small muted">{ humanSize(e.Size) }</span>
+									} else if e.Status == "failed" {
+										<span class="small muted">{ e.Error }</span>
+									}
+								</td>
+								<td><a class="lnk" href={ templ.SafeURL(filtersHref(e.Query)) }>Open these filters</a></td>
+							</tr>
+						}
+						if len(vm.Rows) == 0 {
+							<tr><td colspan="5" class="muted" style="padding:28px;text-align:center">No exports yet. Exports larger than a few thousand rows appear here while they are prepared.</td></tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
+}
+
+// ExportNotices is the htmx response for finished exports (appended to #notices).
+templ ExportNotices(notes []ExportNotice) {
+	for _, n := range notes {
+		<div class="notice-card" role="status">
+			if n.OK {
+				<span>Your export of { model.Thousands(n.Rows) } applications is ready.</span>
+				<a class="btn sm pri" href={ templ.SafeURL(fmt.Sprintf("/exports/%d/download", n.ID)) } data-dismiss-after>Download</a>
+			} else {
+				<span>An export failed. <a href="/exports">See Exports</a> and try again.</span>
+			}
+			<button type="button" class="notice-x" aria-label="Dismiss" data-dismiss>×</button>
+		</div>
+	}
+}

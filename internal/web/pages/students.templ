@@ -106,12 +106,7 @@ templ studentResults(vm StudentsVM) {
 				</tbody>
 			</table>
 		</div>
-		<div class="small muted" style="padding:12px 14px">
-			{ plural(vm.Total, "student", "students") }
-			if vm.Total > len(vm.Rows) {
-				· showing the { strconv.Itoa(len(vm.Rows)) } most recently updated. Narrow the filters to see others.
-			}
-		</div>
+		@components.Pager(vm.Page, "student", "students", "/students", vm.Query)
 	</div>
 }
 

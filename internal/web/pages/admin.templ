@@ -53,7 +53,7 @@ templ Applications(vm ApplicationsVM) {
 templ stat(label string, n int, color string) {
 	<div class="stat">
 		<span>{ label }</span>
-		<strong class={ color }>{ strconv.Itoa(n) }</strong>
+		<strong class={ color }>{ model.Thousands(n) }</strong>
 	</div>
 }
 
@@ -66,7 +66,14 @@ templ applicationResults(vm ApplicationsVM) {
 					<a class="lnk" href="/applications">Clear all</a>
 				}
 			</div>
-			<a class="btn pri" href={ templ.SafeURL(vm.ExportHref) } download>Export CSV ({ strconv.Itoa(vm.Stats.Total) })</a>
+			<form class="row" method="post" action="/applications/export" style="gap:10px">
+				@layout.CSRF()
+				<input type="hidden" name="query" value={ vm.Query }/>
+				if vm.Stats.Total > vm.DirectLimit {
+					<span class="small muted">Large export: prepared in the background</span>
+				}
+				<button class="btn pri" type="submit" disabled?={ vm.Stats.Total == 0 }>Export CSV ({ model.Thousands(vm.Stats.Total) })</button>
+			</form>
 		</div>
 		<div class="stats">
 			@stat("Applications (filtered)", vm.Stats.Total, "")
@@ -126,12 +133,7 @@ templ applicationResults(vm ApplicationsVM) {
 					</tbody>
 				</table>
 			</div>
-			<div class="small muted" style="padding:12px 14px">
-				{ plural(vm.Stats.Total, "application", "applications") }
-				if vm.Stats.Total > len(vm.Rows) {
-					· showing the { strconv.Itoa(len(vm.Rows)) } most recently updated. The CSV export includes all of them.
-				}
-			</div>
+			@components.Pager(vm.Page, "application", "applications", "/applications", vm.Query)
 		</div>
 	</div>
 }

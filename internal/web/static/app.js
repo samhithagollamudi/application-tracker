@@ -161,3 +161,11 @@ document.addEventListener('htmx:configRequest', (e) => {
     });
   });
 })();
+
+// Export-ready notices: dismiss with ×, or automatically after clicking Download.
+document.addEventListener('click', (e) => {
+  const x = e.target.closest('[data-dismiss]');
+  if (x) { x.closest('.notice-card').remove(); return; }
+  const d = e.target.closest('[data-dismiss-after]');
+  if (d) setTimeout(() => d.closest('.notice-card').remove(), 500);
+});

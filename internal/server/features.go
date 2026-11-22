@@ -6,6 +6,7 @@ import (
 	"github.com/ChandraShekar2001/application-tracker/internal/applications"
 	"github.com/ChandraShekar2001/application-tracker/internal/auth"
 	"github.com/ChandraShekar2001/application-tracker/internal/catalog"
+	"github.com/ChandraShekar2001/application-tracker/internal/export"
 	"github.com/ChandraShekar2001/application-tracker/internal/model"
 	"github.com/ChandraShekar2001/application-tracker/internal/students"
 )
@@ -14,7 +15,11 @@ func registerFeatures(app *http.ServeMux, am *auth.Manager, d Deps, notFound htt
 	cat := catalog.New(d.Pool)
 	appSvc := applications.New(d.Pool)
 	sh := &students.Handlers{Svc: students.New(d.Pool), Cat: cat, Apps: appSvc, Pool: d.Pool, Auth: am}
-	ah := &applications.Handlers{Svc: appSvc, Cat: cat, Auth: am}
+	limit := d.ExportDirectLimit
+	if limit <= 0 {
+		limit = export.DefaultDirectLimit
+	}
+	ah := &applications.Handlers{Svc: appSvc, Cat: cat, Auth: am, ExportDirectLimit: limit}
 
 	login := func(f http.HandlerFunc) http.Handler { return auth.RequireLogin(f) }
 	creators := auth.RequireRole(notFound, model.RoleConsultant, model.RoleAgentNetwork)
@@ -36,5 +41,5 @@ func registerFeatures(app *http.ServeMux, am *auth.Manager, d Deps, notFound htt
 	app.Handle("POST /applications/{id}/delete", login(ah.Delete))
 	app.Handle("GET /catalog/universities/search", login(ah.SearchUniversities))
 
-	registerAdmin(app, am, d, cat, ah, admin)
+	registerAdmin(app, am, d, cat, ah, admin, limit)
 }

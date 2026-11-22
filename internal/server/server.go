@@ -21,6 +21,12 @@ type Deps struct {
 	Cfg  config.Config
 	Pool *pgxpool.Pool
 	Log  *slog.Logger
+	// Ctx scopes background work (export jobs); it should end at shutdown.
+	// When nil, background exports are queued but never run.
+	Ctx context.Context
+	// ExportDirectLimit: exports up to this many rows download immediately;
+	// larger ones run in the background. 0 means export.DefaultDirectLimit.
+	ExportDirectLimit int
 }
 
 // New builds the full application handler.
