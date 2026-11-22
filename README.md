@@ -13,10 +13,10 @@ cd application-tracker
 ./scripts/dev.sh          # or: make dev
 ```
 
-The first run creates a local database (in Docker, or in a `.dev/` folder using your Postgres install), loads demo data and starts the app at **http://localhost:8080**. The demo logins (one per role, shared password) are printed and saved in `.dev/demo-users.txt`.
+The first run creates a local database (in Docker, or in a `.dev/` folder using your Postgres install), loads demo data and starts the app at **http://localhost:8080** (or the next free port; the URL is printed). The demo logins (one per role, shared password) are printed and saved in `.dev/demo-users.txt`.
 
 - `./scripts/dev.sh stop` stops the database; `./scripts/dev.sh reset` wipes local data and starts fresh.
-- Ports in use? `PORT=8081 DB_PORT=5434 ./scripts/dev.sh`.
+- Free ports are picked automatically; to choose them yourself: `PORT=8081 DB_PORT=5434 ./scripts/dev.sh`.
 - Nothing you do locally touches anyone else's data; `.dev/` and `.env` are gitignored.
 
 ## Local development
