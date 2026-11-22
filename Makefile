@@ -7,7 +7,10 @@ include .env
 export
 endif
 
-.PHONY: tools generate build run migrate test lint db-up db-down docker
+.PHONY: dev tools generate build run migrate test lint db-up db-down docker
+
+dev: ## one-command local setup + run (see scripts/dev.sh)
+	./scripts/dev.sh
 
 tools: ## install code generators and linters
 	go install github.com/a-h/templ/cmd/templ@v0.3.1118

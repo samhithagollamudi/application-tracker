@@ -1,4 +1,4 @@
-# Local Postgres for development: `docker compose up -d db`
+# Local Postgres for development (used by scripts/dev.sh when Docker is available).
 services:
   db:
     image: postgres:16
@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: sny
       POSTGRES_DB: sny_tracker
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
