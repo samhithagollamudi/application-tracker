@@ -1,6 +1,9 @@
 package pages
 
-import "github.com/ChandraShekar2001/application-tracker/internal/web/layout"
+import (
+	"github.com/ChandraShekar2001/application-tracker/internal/web/layout"
+	"github.com/ChandraShekar2001/application-tracker/internal/web/static"
+)
 
 templ Error(status int, title, message string) {
 	@layout.Page(title, "") {
@@ -24,7 +27,7 @@ templ Login(email, errMsg string) {
 				<div class="box">
 					<form class="card" method="post" action="/login">
 						@layout.CSRF()
-						<img src="/static/logo.png" alt="SNY Cosmos Overseas" style="width:220px;height:auto"/>
+						<img src={ "/static/logo.png?v=" + static.Version } alt="SNY Cosmos Overseas" style="width:220px;height:auto"/>
 						<h2>Sign in</h2>
 						<label class="f">
 							User ID

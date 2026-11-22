@@ -74,7 +74,7 @@ templ Page(title string, active string) {
 		if u := reqctx.User(ctx); u != nil {
 			<div class="shell">
 				<aside class="side">
-					<a href="/"><img class="logo-img" src="/static/logo.png" alt="SNY Cosmos Overseas"/></a>
+					<a href="/"><img class="logo-img" src={ "/static/logo.png?v=" + static.Version } alt="SNY Cosmos Overseas"/></a>
 					<div class={ "role", roleClass(u) }>{ u.RoleLabel() }</div>
 					<nav class="nav" aria-label="Main">
 						for _, it := range navItems(u) {
