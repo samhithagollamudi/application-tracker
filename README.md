@@ -2,9 +2,26 @@
 
 Go + templ + htmx + PostgreSQL. Scope and decisions: [implementation-plan.md](implementation-plan.md). Operations (deploy, backups, restore drill): [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
+## Quick start (run it on your laptop)
+
+You need **Go 1.26+** and **either** Docker Desktop **or** PostgreSQL installed
+(macOS: `brew install go postgresql@16`; Ubuntu: `sudo apt install golang postgresql`; Windows: use WSL).
+
+```bash
+git clone https://github.com/samhithagollamudi/application-tracker.git
+cd application-tracker
+./scripts/dev.sh          # or: make dev
+```
+
+The first run creates a local database (in Docker, or in a `.dev/` folder using your Postgres install), loads demo data and starts the app at **http://localhost:8080**. The demo logins (one per role, shared password) are printed and saved in `.dev/demo-users.txt`.
+
+- `./scripts/dev.sh stop` stops the database; `./scripts/dev.sh reset` wipes local data and starts fresh.
+- Ports in use? `PORT=8081 DB_PORT=5434 ./scripts/dev.sh`.
+- Nothing you do locally touches anyone else's data; `.dev/` and `.env` are gitignored.
+
 ## Local development
 
-Requirements: Go 1.26+, PostgreSQL 16 (`make db-up` with Docker, or any local install).
+Requirements: Go 1.26+, PostgreSQL 16 (`./scripts/dev.sh` handles it, or `make db-up` with Docker, or any local install).
 
 ```bash
 make tools                 # templ, sqlc, goose, staticcheck into $(go env GOPATH)/bin
