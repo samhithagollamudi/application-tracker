@@ -114,3 +114,4 @@ a.rowlink{color:var(--b);font-weight:700;text-decoration:none}
 .tabs a.tab{display:inline-flex;align-items:center;height:42px;padding:0 2px;font-weight:600;color:var(--mu);border-bottom:3px solid transparent;text-decoration:none}
 .tabs a.tab.on{color:var(--p);border-bottom-color:var(--p)}
 .c-blue{color:#283593}.c-green{color:#1E6B34}.c-purple{color:#6e2570}
+a.btn{text-decoration:none}

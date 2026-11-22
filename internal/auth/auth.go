@@ -19,6 +19,7 @@ import (
 	"github.com/ChandraShekar2001/application-tracker/internal/db/gen"
 	"github.com/ChandraShekar2001/application-tracker/internal/model"
 	"github.com/ChandraShekar2001/application-tracker/internal/reqctx"
+	"github.com/ChandraShekar2001/application-tracker/internal/web/pages"
 )
 
 const (
@@ -45,6 +46,10 @@ func New(pool *pgxpool.Pool, log *slog.Logger, prod bool) *Manager {
 	sm.Lifetime = 12 * time.Hour
 	sm.IdleTimeout = 4 * time.Hour
 	sm.Cookie.Name = "sny_session"
+	if prod {
+		// __Host- prefix: browser enforces Secure, Path=/ and no Domain.
+		sm.Cookie.Name = "__Host-sny_session"
+	}
 	sm.Cookie.HttpOnly = true
 	sm.Cookie.SameSite = http.SameSiteLaxMode
 	sm.Cookie.Secure = prod
@@ -109,9 +114,11 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 				sent = r.PostFormValue(CSRFField)
 			}
 			if subtle.ConstantTimeCompare([]byte(sent), []byte(tok)) != 1 {
-				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write([]byte("Your session has expired or the form is stale. Go back, reload the page and try again."))
+				_ = pages.Error(http.StatusForbidden, "Please try again",
+					"Your session expired or the form was out of date. Go back, reload the page and submit it again.").
+					Render(ctx, w)
 				return
 			}
 		} else if r.Header.Get("HX-Request") == "" {

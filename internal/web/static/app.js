@@ -117,3 +117,14 @@ document.addEventListener('change', (e) => {
   f.querySelector('[data-branch-field]').hidden = e.target.value !== 'consultant';
   f.querySelector('[data-network-hint]').hidden = e.target.value !== 'agent_network';
 });
+
+// Keep filter URLs clean: drop empty GET parameters from htmx requests.
+document.addEventListener('htmx:configRequest', (e) => {
+  if (e.detail.verb !== 'get') return;
+  const p = e.detail.parameters;
+  const keys = typeof p.keys === 'function' ? Array.from(p.keys()) : Object.keys(p);
+  keys.forEach((k) => {
+    const v = typeof p.get === 'function' ? p.get(k) : p[k];
+    if (v === '' || v == null) { if (typeof p.delete === 'function') p.delete(k); else delete p[k]; }
+  });
+});

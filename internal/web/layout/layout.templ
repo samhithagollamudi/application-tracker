@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"github.com/ChandraShekar2001/application-tracker/internal/web/static"
 	"github.com/ChandraShekar2001/application-tracker/internal/model"
 	"github.com/ChandraShekar2001/application-tracker/internal/reqctx"
 )
@@ -45,11 +46,12 @@ templ Base(title string) {
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="csrf-token" content={ reqctx.CSRF(ctx) }/>
 			<title>{ title } · SNY Cosmos Tracker</title>
+			<link rel="icon" type="image/svg+xml" href={ "/static/favicon.svg?v=" + static.Version }/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"/>
-			<link rel="stylesheet" href="/static/app.css"/>
-			<script src="/static/htmx.min.js" defer></script>
-			<script src="/static/app.js" defer></script>
+			<link rel="stylesheet" href={ "/static/app.css?v=" + static.Version }/>
+			<script src={ "/static/htmx.min.js?v=" + static.Version } defer></script>
+			<script src={ "/static/app.js?v=" + static.Version } defer></script>
 		</head>
 		<body>
 			{ children... }

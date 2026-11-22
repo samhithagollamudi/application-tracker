@@ -49,6 +49,8 @@ func New(d Deps) http.Handler {
 
 	root := http.NewServeMux()
 	root.Handle("GET /static/", http.StripPrefix("/static/", static.Handler()))
+	root.Handle("GET /robots.txt", static.Handler())
+	root.Handle("GET /favicon.ico", http.RedirectHandler("/static/favicon.svg", http.StatusMovedPermanently))
 	root.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		c, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()

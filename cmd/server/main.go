@@ -3,6 +3,7 @@
 //	server                                         migrate, then serve HTTP
 //	server migrate                                 apply migrations and exit
 //	server create-admin --email E --name "N"       create an admin; prints a generated password once
+//	server seed-demo [--domain demo.local]         development only: sample data in an EMPTY database
 package main
 
 import (
@@ -26,6 +27,7 @@ import (
 	"github.com/ChandraShekar2001/application-tracker/internal/config"
 	"github.com/ChandraShekar2001/application-tracker/internal/db"
 	"github.com/ChandraShekar2001/application-tracker/internal/db/gen"
+	"github.com/ChandraShekar2001/application-tracker/internal/demo"
 	"github.com/ChandraShekar2001/application-tracker/internal/server"
 )
 
@@ -68,8 +70,28 @@ func run(log *slog.Logger, args []string) error {
 		return nil
 	case "create-admin":
 		return createAdmin(ctx, pool, args)
+	case "seed-demo":
+		if cfg.IsProd() {
+			return errors.New("seed-demo is refused when APP_ENV=production")
+		}
+		fs := flag.NewFlagSet("seed-demo", flag.ContinueOnError)
+		domain := fs.String("domain", "demo.local", "email domain for the demo users")
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		users, pw, err := demo.Seed(ctx, pool, *domain)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\nDemo data created. Every demo user has the same password:")
+		fmt.Printf("  Password: %s\n\n", pw)
+		for _, u := range users {
+			fmt.Printf("  %-14s %s\n", u.Role, u.Email)
+		}
+		fmt.Println()
+		return nil
 	default:
-		return fmt.Errorf("unknown command %q (want: serve, migrate, create-admin)", cmd)
+		return fmt.Errorf("unknown command %q (want: serve, migrate, create-admin, seed-demo)", cmd)
 	}
 }
 

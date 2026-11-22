@@ -117,6 +117,9 @@ func SecurityHeaders(prod bool) func(http.Handler) http.Handler {
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("Referrer-Policy", "same-origin")
 			h.Set("X-Frame-Options", "DENY")
+			h.Set("X-Robots-Tag", "noindex, nofollow")
+			h.Set("Cross-Origin-Opener-Policy", "same-origin")
+			h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
 			if prod {
 				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 			}

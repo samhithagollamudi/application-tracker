@@ -1,0 +1,11 @@
+# App service. The backup job is a second Railway service using
+# docker/backup/Dockerfile with a cron schedule (see docs/RUNBOOK.md).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "docker/Dockerfile"
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
