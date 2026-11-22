@@ -9,16 +9,28 @@
 # Everything it creates lives in .dev/ (gitignored). Works on macOS and Linux
 # (on Windows, run it inside WSL).
 #
-# Optional env: PORT (app, default 8080), DB_PORT (database, default 5433).
+# Optional env: PORT (app), DB_PORT (database). If unset, the first free port
+# from 8080 / 5433 upwards is used and remembered in .dev/ for later runs.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 DEV="$ROOT/.dev"
-PORT="${PORT:-8080}"
-DB_PORT="${DB_PORT:-5433}"
-DB_URL="postgres://sny:sny@localhost:$DB_PORT/sny_tracker?sslmode=disable"
 PGDATA_DIR="$DEV/pgdata"
+mkdir -p "$DEV"
+
+in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+# pick_port NAME DEFAULT: explicit env wins; else the remembered port; else the first free one.
+pick_port() {
+  local name=$1 start=$2 file="$DEV/$1" p
+  if [ -n "${!name:-}" ]; then echo "${!name}"; return; fi
+  if [ -f "$file" ]; then cat "$file"; return; fi
+  for p in $(seq "$start" $((start + 20))); do
+    in_use "$p" || { echo "$p" > "$file"; echo "$p"; return; }
+  done
+  echo "$start"
+}
 
 say()  { printf '\033[1;35m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
@@ -123,10 +135,14 @@ reset_all() {
     DB_PORT="$DB_PORT" docker compose down -v >/dev/null
   fi
   rm -rf "$DEV"
+  mkdir -p "$DEV"
   say "Local data removed."
 }
 
 # ---------- main ----------
+DB_PORT=$(pick_port DB_PORT 5433)
+DB_URL="postgres://sny:sny@localhost:$DB_PORT/sny_tracker?sslmode=disable"
+
 case "${1:-up}" in
   stop)  stop_db; exit 0 ;;
   reset) reset_all ;;
@@ -137,9 +153,14 @@ esac
 check_go
 start_db
 
-if [ ! -f .env ]; then
-  say "Writing .env"
-  printf 'DATABASE_URL=%s\nPORT=%s\nAPP_ENV=development\n' "$DB_URL" "$PORT" > .env
+PORT=$(pick_port PORT 8080)
+if in_use "$PORT"; then
+  die "Port $PORT is already in use by another program. Run: PORT=8081 $0"
+fi
+
+# Keep .env in sync for 'make run' (only if this script wrote it).
+if [ ! -f .env ] || grep -q '^# written by scripts/dev.sh' .env; then
+  printf '# written by scripts/dev.sh\nDATABASE_URL=%s\nPORT=%s\nAPP_ENV=development\n' "$DB_URL" "$PORT" > .env
 fi
 
 say "Building the server"
