@@ -88,7 +88,7 @@ func (s *Service) Resolve(ctx context.Context, f *model.ApplicationFields) (*Inp
 			}
 		}
 		if u == nil {
-			errs["university"] = "That university is not in the list any more. Search again."
+			errs["university"] = "That university is no longer available. Search again."
 			f.UniversityID, f.UniversityName = "", ""
 			break
 		}

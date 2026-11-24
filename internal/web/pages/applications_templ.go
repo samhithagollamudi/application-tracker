@@ -1013,7 +1013,7 @@ func UniSearchResults(unis []model.University) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "<button type=\"button\" role=\"option\" class=\"other\" data-pick=\"__other\">Other (not in the list)</button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "<button type=\"button\" role=\"option\" class=\"other\" data-pick=\"__other\">Other</button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

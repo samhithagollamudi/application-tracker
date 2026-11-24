@@ -248,7 +248,7 @@ templ consultancyField(vm StudentFormVM) {
 					for _, c := range vm.Consultancies {
 						<option value={ c.Value } selected?={ c.Value == vm.ConsultancyID }>{ c.Label }</option>
 					}
-					<option value="__other" selected?={ vm.ConsultancyID == "__other" }>Other (not in the list)</option>
+					<option value="__other" selected?={ vm.ConsultancyID == "__other" }>Other</option>
 				</select>
 				<input name="consultancy_other" id="consOther" type="text" value={ vm.ConsOther } placeholder="Type the consultancy name" aria-label="Consultancy name" hidden?={ vm.ConsultancyID != "__other" }/>
 				if e := vm.Errs["consultancy"]; e != "" {

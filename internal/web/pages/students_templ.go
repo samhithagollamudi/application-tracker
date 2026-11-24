@@ -971,7 +971,7 @@ func consultancyField(vm StudentFormVM) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, ">Other (not in the list)</option></select> <input name=\"consultancy_other\" id=\"consOther\" type=\"text\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, ">Other</option></select> <input name=\"consultancy_other\" id=\"consOther\" type=\"text\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
