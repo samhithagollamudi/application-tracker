@@ -69,8 +69,9 @@ func (s *Service) UniversityOptions(ctx context.Context) ([]model.Option, error)
 	return out, nil
 }
 
-func (s *Service) SearchUniversities(ctx context.Context, q string) ([]model.University, error) {
-	rows, err := s.q.SearchUniversities(ctx, q)
+// SearchUniversities matches name or country; country, when set, limits results to that country.
+func (s *Service) SearchUniversities(ctx context.Context, country, q string) ([]model.University, error) {
+	rows, err := s.q.SearchUniversities(ctx, gen.SearchUniversitiesParams{Country: country, Q: q})
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +150,36 @@ func (s *Service) CountryOptions(ctx context.Context) ([]model.Option, error) {
 	out := make([]model.Option, len(cs))
 	for i, c := range cs {
 		out[i] = model.Option{Value: c, Label: c}
+	}
+	return out, nil
+}
+
+// CountryNames is the admin-maintained country list, alphabetical.
+func CountryNames(ctx context.Context, db gen.DBTX) ([]string, error) {
+	return gen.New(db).ListCountryNames(ctx)
+}
+
+// CanonicalCountry returns the list spelling of name (case-insensitive), or ok=false.
+func CanonicalCountry(ctx context.Context, db gen.DBTX, name string) (string, bool, error) {
+	n, err := gen.New(db).GetCountryName(ctx, name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	return n, err == nil, err
+}
+
+// YearOptions lists the intake years used by applications.
+func (s *Service) YearOptions(ctx context.Context) ([]model.Option, error) {
+	ys, err := s.q.ListUsedYears(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.Option, 0, len(ys))
+	for _, y := range ys {
+		if y != nil {
+			v := strconv.Itoa(int(*y))
+			out = append(out, model.Option{Value: v, Label: v})
+		}
 	}
 	return out, nil
 }

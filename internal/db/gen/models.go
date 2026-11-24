@@ -55,6 +55,12 @@ type Consultancy struct {
 	CreatedAt time.Time
 }
 
+type Country struct {
+	ID        int16
+	Name      string
+	CreatedAt time.Time
+}
+
 type Export struct {
 	ID         int64
 	UserID     int64

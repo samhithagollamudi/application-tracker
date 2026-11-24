@@ -32,7 +32,7 @@ func scanApp(row pgx.Row) (*model.Application, error) {
 	var a model.Application
 	var uniID *int64
 	err := row.Scan(&a.ID, &a.StudentID, &uniID, &a.Uni, &a.Country, &a.Custom,
-		&a.UniOther, &a.UniOtherCountry, &a.Level, &a.Programme, &a.Priority,
+		&a.UniOther, &a.CountryName, &a.Level, &a.Programme, &a.Priority,
 		&a.Intake, &a.Year, &a.ApplicationNumber, &a.SubmissionDate, &a.Status,
 		&a.PersonalCode, &a.TuitionFee, &a.Currency, &a.TuitionPer, &a.Scholarship,
 		&a.CreatedAt, &a.UpdatedAt)
@@ -42,6 +42,7 @@ func scanApp(row pgx.Row) (*model.Application, error) {
 	if uniID != nil {
 		a.UniversityID = strconv.FormatInt(*uniID, 10)
 		a.UniversityName = a.Uni
+		a.CountryName = a.Country
 	}
 	return &a, nil
 }

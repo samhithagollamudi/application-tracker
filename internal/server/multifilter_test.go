@@ -43,11 +43,11 @@ func TestMultiValueFilters(t *testing.T) {
 	check("/applications?source=internal&source=b2b", all...)
 	check(fmt.Sprintf("/applications?consultancy=none&consultancy=%d", alpha), all...)
 	check(fmt.Sprintf("/applications?consultancy=%d", alpha), "kavya@example.com")
-	check("/applications?intake=autumn-2027&intake=spring-2027", "priya@example.com")
+	check("/applications?intake=autumn&intake=spring&year=2027", "priya@example.com")
 	// Filters combine with AND across groups, OR within a group.
 	check(fmt.Sprintf("/applications?branch=%d&branch=%d&status=admitted", chennai, hyd), "rahul@example.com")
 	// Garbage values are ignored, not errors.
-	check("/applications?status=bogus&branch=abc&intake=summer-xx", all...)
+	check("/applications?status=bogus&branch=abc&intake=summer&year=xx", all...)
 
 	check(fmt.Sprintf("/students?branch=%d&branch=%d", chennai, hyd), "priya@example.com", "rahul@example.com")
 	check("/students?status=applied&status=admitted", "priya@example.com", "rahul@example.com")

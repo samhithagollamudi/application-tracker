@@ -3,9 +3,10 @@ SELECT id, name, country FROM universities ORDER BY lower(name);
 
 -- name: SearchUniversities :many
 SELECT id, name, country FROM universities
-WHERE sqlc.arg(q)::text = ''
+WHERE (sqlc.arg(country)::text = '' OR country = sqlc.arg(country)::text)
+  AND (sqlc.arg(q)::text = ''
    OR name ILIKE '%' || sqlc.arg(q)::text || '%'
-   OR country ILIKE '%' || sqlc.arg(q)::text || '%'
+   OR country ILIKE '%' || sqlc.arg(q)::text || '%')
 ORDER BY lower(name)
 LIMIT 30;
 
@@ -55,3 +56,26 @@ DELETE FROM universities u WHERE u.id = $1
 -- name: DeleteUnusedConsultancy :execrows
 DELETE FROM consultancies c WHERE c.id = $1
   AND NOT EXISTS (SELECT 1 FROM students s WHERE s.consultancy_id = c.id);
+
+-- name: ListCountryNames :many
+SELECT name FROM countries ORDER BY lower(name);
+
+-- name: GetCountryName :one
+SELECT name FROM countries WHERE lower(name) = lower(sqlc.arg(name)::text);
+
+-- name: ListCountriesAdmin :many
+SELECT c.id, c.name,
+       (SELECT count(*) FROM universities u WHERE u.country = c.name)::int AS universities,
+       (SELECT count(*) FROM applications a WHERE a.custom_university_country = c.name)::int AS one_off_applications
+FROM countries c ORDER BY lower(c.name);
+
+-- name: CreateCountry :one
+INSERT INTO countries (name) VALUES ($1) RETURNING id;
+
+-- name: DeleteUnusedCountry :execrows
+DELETE FROM countries c WHERE c.id = $1
+  AND NOT EXISTS (SELECT 1 FROM universities u WHERE u.country = c.name)
+  AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.custom_university_country = c.name);
+
+-- name: ListUsedYears :many
+SELECT DISTINCT year FROM applications WHERE year IS NOT NULL ORDER BY year;

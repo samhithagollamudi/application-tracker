@@ -45,7 +45,7 @@ func appSub(a model.Application) string {
 func afterAdmission(a model.Application) string {
 	var parts []string
 	if t := a.Tuition(); t != "" {
-		parts = append(parts, "Tuition "+t)
+		parts = append(parts, "Tuition fee: "+t)
 	}
 	if a.Scholarship != "" {
 		parts = append(parts, "Scholarship "+a.Scholarship)
@@ -117,7 +117,24 @@ templ AppCard(a model.Application) {
 }
 
 func isCustom(f model.ApplicationFields) bool {
-	return f.UniversityID == "" && (f.UniOther != "" || f.UniOtherCountry != "")
+	return f.UniversityID == "" && f.UniOther != ""
+}
+
+// pickedCountry is the country of the list university already chosen ("" if none),
+// so app.js can clear the choice when the Country dropdown changes.
+func pickedCountry(f model.ApplicationFields) string {
+	if f.UniversityID == "" {
+		return ""
+	}
+	return f.CountryName
+}
+
+func currencyOptions() []model.Option {
+	out := make([]model.Option, len(model.Currencies))
+	for i, c := range model.Currencies {
+		out[i] = model.Option{Value: c, Label: c}
+	}
+	return out
 }
 
 func orDefault(v, d string) string {
@@ -137,6 +154,18 @@ templ AppFields(vm AppFormVM, embedded bool) {
 			<h2>University &amp; application</h2>
 		}
 		<div class="grid">
+			<label class={ "f", templ.KV("has-err", vm.Errs["country"] != "") }>
+				Country
+				<select id="appCountry" name="country" data-app-country>
+					<option value="">Select country</option>
+					for _, c := range vm.Countries {
+						<option value={ c } selected?={ c == vm.F.CountryName }>{ c }</option>
+					}
+				</select>
+				if e := vm.Errs["country"]; e != "" {
+					<span class="err">{ e }</span>
+				}
+			</label>
 			<div class={ "f", "combo", templ.KV("has-err", vm.Errs["university"] != "") } data-combo>
 				<label for="uniQ">University</label>
 				<input
@@ -154,9 +183,10 @@ templ AppFields(vm AppFormVM, embedded bool) {
 					hx-get="/catalog/universities/search"
 					hx-trigger="focus, input changed delay:200ms"
 					hx-target="#uniList"
+					hx-include="#appCountry"
 					hx-sync="this:replace"
 				/>
-				<input type="hidden" name="university_id" value={ vm.F.UniversityID }/>
+				<input type="hidden" name="university_id" value={ vm.F.UniversityID } data-country={ pickedCountry(vm.F) }/>
 				<input type="hidden" name="university_name" value={ vm.F.UniversityName }/>
 				<div class="combo-list" id="uniList" role="listbox" hidden></div>
 				<div class="combo-other" hidden?={ !isCustom(vm.F) } style="display:flex;flex-direction:column;gap:6px">
@@ -164,19 +194,6 @@ templ AppFields(vm AppFormVM, embedded bool) {
 					<button type="button" class="lnk" data-combo-back style="align-self:flex-start">Back to the list</button>
 				</div>
 				if e := vm.Errs["university"]; e != "" {
-					<span class="err">{ e }</span>
-				}
-			</div>
-			<div class={ "f", templ.KV("has-err", vm.Errs["uni_other_country"] != "") }>
-				<label for="uniCountry">Country</label>
-				<input id="uniCountry" type="text" readonly value={ vm.Country } placeholder="Filled in from the university" hidden?={ isCustom(vm.F) }/>
-				<select id="uniCountrySel" name="uni_other_country" hidden?={ !isCustom(vm.F) }>
-					<option value="">Select country</option>
-					for _, c := range model.Countries {
-						<option value={ c } selected?={ c == vm.F.UniOtherCountry }>{ c }</option>
-					}
-				</select>
-				if e := vm.Errs["uni_other_country"]; e != "" {
 					<span class="err">{ e }</span>
 				}
 			</div>
@@ -199,25 +216,13 @@ templ AppFields(vm AppFormVM, embedded bool) {
 			<summary>After admission</summary>
 			<div class="grid" style="margin-top:12px">
 				@components.Field("Personal code number (Sweden only)", "personal_code", vm.F.PersonalCode, "text", "", "", vm.Errs["personal_code"])
-				<div class={ "f", templ.KV("has-err", vm.Errs["tuition_fee"] != "") }>
-					<label for="tFee">Tuition fee</label>
-					<div class="money">
-						<select name="tuition_currency" aria-label="Currency">
-							for _, c := range model.Currencies {
-								<option value={ c } selected?={ c == orDefault(vm.F.Currency, "EUR") }>{ c }</option>
-							}
-						</select>
-						<input id="tFee" name="tuition_fee" type="text" inputmode="decimal" value={ vm.F.TuitionFee } placeholder="Amount"/>
-					</div>
-					if e := vm.Errs["tuition_fee"]; e != "" {
-						<span class="err">{ e }</span>
-					}
-				</div>
+				@components.Field("Tuition fee", "tuition_fee", vm.F.TuitionFee, "text", "Amount, e.g. 120000", "", vm.Errs["tuition_fee"])
+				@components.Select("Tuition fee currency", "tuition_currency", orDefault(vm.F.Currency, "EUR"), currencyOptions(), "", vm.Errs["tuition_currency"])
 				@components.Select("Tuition fee is per", "tuition_per", vm.F.TuitionPer, model.TuitionPer, "Select", vm.Errs["tuition_per"])
 				@components.Field("Scholarship", "scholarship", vm.F.Scholarship, "text", "Amount or %", "", vm.Errs["scholarship"])
 			</div>
 		</details>
-		<p class="small muted" style="margin:0">The university list is the one the admin maintains. Pick “Other” to type a university just for this application; it is <b>not</b> added to the list.</p>
+		<p class="small muted" style="margin:0">For any non-partner university application, pick “Other” and type the university name.</p>
 	</section>
 }
 

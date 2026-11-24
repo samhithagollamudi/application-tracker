@@ -47,7 +47,11 @@ func (h *Handlers) NewForm(w http.ResponseWriter, r *http.Request) {
 		web.ServerError(w, r, err)
 		return
 	}
-	vm := h.Svc.FormVM(model.ApplicationFields{}, nil, "")
+	vm, err := h.Svc.FormVM(r.Context(), model.ApplicationFields{}, nil)
+	if err != nil {
+		web.ServerError(w, r, err)
+		return
+	}
 	h.fill(&vm, "Add application", fmt.Sprintf("/students/%d/applications/new", sid), sid, name, "Add application")
 	h.render(w, r, http.StatusOK, vm)
 }
@@ -82,7 +86,11 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if errs != nil {
-		vm := h.Svc.FormVM(f, errs, in.Country)
+		vm, err := h.Svc.FormVM(ctx, f, errs)
+		if err != nil {
+			web.ServerError(w, r, err)
+			return
+		}
 		h.fill(&vm, "Add application", fmt.Sprintf("/students/%d/applications/new", sid), sid, name, "Add application")
 		h.render(w, r, http.StatusUnprocessableEntity, vm)
 		return
@@ -128,11 +136,11 @@ func (h *Handlers) EditForm(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	country := ""
-	if !a.Custom {
-		country = a.Country
+	vm, err := h.Svc.FormVM(r.Context(), a.ApplicationFields, nil)
+	if err != nil {
+		web.ServerError(w, r, err)
+		return
 	}
-	vm := h.Svc.FormVM(a.ApplicationFields, nil, country)
 	h.fill(&vm, "Edit application", fmt.Sprintf("/applications/%d/edit", a.ID), a.StudentID, name, "Save changes")
 	h.render(w, r, http.StatusOK, vm)
 }
@@ -150,7 +158,11 @@ func (h *Handlers) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if errs != nil {
-		vm := h.Svc.FormVM(f, errs, in.Country)
+		vm, err := h.Svc.FormVM(ctx, f, errs)
+		if err != nil {
+			web.ServerError(w, r, err)
+			return
+		}
 		h.fill(&vm, "Edit application", fmt.Sprintf("/applications/%d/edit", a.ID), a.StudentID, name, "Save changes")
 		h.render(w, r, http.StatusUnprocessableEntity, vm)
 		return
@@ -222,7 +234,7 @@ func (h *Handlers) SearchUniversities(w http.ResponseWriter, r *http.Request) {
 	if len(q) > 100 {
 		q = q[:100]
 	}
-	unis, err := h.Cat.SearchUniversities(r.Context(), q)
+	unis, err := h.Cat.SearchUniversities(r.Context(), r.URL.Query().Get("country"), q)
 	if err != nil {
 		web.ServerError(w, r, err)
 		return
@@ -245,7 +257,7 @@ func (h *Handlers) AdminList(w http.ResponseWriter, r *http.Request) {
 		Stats: pages.AppStats{Total: st.Total, Waiting: st.Waiting, Admitted: st.Admitted, B2B: st.B2B},
 		F: pages.AppFilterForm{
 			Q: q.Get("q"), Branch: q["branch"], Country: q["country"], University: q["university"],
-			Status: q["status"], Intake: q["intake"], Level: q["level"], Source: q["source"],
+			Status: q["status"], Intake: q["intake"], Year: q["year"], Level: q["level"], Source: q["source"],
 			Consultancy: q["consultancy"], From: q.Get("from"), To: q.Get("to"),
 		},
 		Page:        page,
@@ -258,7 +270,7 @@ func (h *Handlers) AdminList(w http.ResponseWriter, r *http.Request) {
 	}{
 		{&vm.Branches, h.Cat.BranchOptions}, {&vm.Countries, h.Cat.CountryOptions},
 		{&vm.Universities, h.Cat.UniversityOptions}, {&vm.Consultancies, h.Cat.ConsultancyOptions},
-		{&vm.Intakes, h.Svc.IntakeOptions},
+		{&vm.Years, h.Cat.YearOptions},
 	} {
 		if *load.dst, err = load.fn(ctx); err != nil {
 			web.ServerError(w, r, err)

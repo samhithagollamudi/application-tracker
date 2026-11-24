@@ -15,7 +15,7 @@ func TestAdminApplicationsFilters(t *testing.T) {
 	w := newWorld(t)
 	// Make the data more varied.
 	w.chennai.Post(fmt.Sprintf("/students/%d/applications/new", w.sChennai), url.Values{
-		"uni_other": {"Tiny Polytechnic"}, "uni_other_country": {"Estonia"}, "status": {"admitted"}, "intake": {"spring"}, "year": {"2028"},
+		"uni_other": {"Tiny Polytechnic"}, "country": {"Estonia"}, "status": {"admitted"}, "intake": {"spring"}, "year": {"2028"},
 	})
 
 	r := w.admin.Get("/applications")
@@ -26,11 +26,11 @@ func TestAdminApplicationsFilters(t *testing.T) {
 		t.Error("expected 4 applications in total")
 	}
 	cases := map[string][]string{ // query -> student emails expected (others must be absent)
-		"source=b2b":         {"kavya@example.com"},
-		"country=Estonia":    {"priya@example.com"},
-		"status=admitted":    {"priya@example.com"},
-		"intake=spring-2028": {"priya@example.com"},
-		"q=tiny":             {"priya@example.com"},
+		"source=b2b":              {"kavya@example.com"},
+		"country=Estonia":         {"priya@example.com"},
+		"status=admitted":         {"priya@example.com"},
+		"intake=spring&year=2028": {"priya@example.com"},
+		"q=tiny":                  {"priya@example.com"},
 		"q=" + url.QueryEscape("APP-"+fmt.Sprint(w.aHyd)): {"rahul@example.com"},
 		"consultancy=none&q=rahul":                        {"rahul@example.com"},
 		"from=2000-01-01&to=2000-01-02":                   {},
@@ -119,7 +119,7 @@ func TestUserManagement(t *testing.T) {
 	if r := c.Post("/login", url.Values{"email": {"pune@sny.test"}, "password": {pw}}); r.Status != http.StatusSeeOther {
 		t.Fatalf("new user can't sign in: %d", r.Status)
 	}
-	if r := c.Get("/students"); !strings.Contains(r.Body, "Consultant · Pune") {
+	if r := c.Get("/students"); !strings.Contains(r.Body, "Pune · Consultant") {
 		t.Fatal("new consultant not in Pune")
 	}
 

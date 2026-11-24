@@ -54,7 +54,7 @@ func ParseFields(r *http.Request) model.ApplicationFields {
 	v := func(k string) string { return strings.TrimSpace(r.PostFormValue(k)) }
 	return model.ApplicationFields{
 		UniversityID: v("university_id"), UniversityName: v("university_name"),
-		UniOther: strings.Join(strings.Fields(v("uni_other")), " "), UniOtherCountry: v("uni_other_country"),
+		UniOther: strings.Join(strings.Fields(v("uni_other")), " "), CountryName: v("country"),
 		Level: v("programme_level"), Programme: v("programme"), Priority: v("priority"),
 		Intake: v("intake"), Year: v("year"), ApplicationNumber: v("application_number"),
 		SubmissionDate: v("submission_date"), Status: v("status"), PersonalCode: v("personal_code"),
@@ -93,7 +93,7 @@ func (s *Service) Resolve(ctx context.Context, f *model.ApplicationFields) (*Inp
 			break
 		}
 		in.UniversityID, in.UniLabel, in.Country = &u.ID, u.Name, u.Country
-		f.UniversityName, f.UniOther, f.UniOtherCountry = u.Name, "", ""
+		f.UniversityName, f.UniOther, f.CountryName = u.Name, "", u.Country
 	case f.UniOther != "":
 		if utf8.RuneCountInString(f.UniOther) > 200 {
 			errs["university"] = "Keep the university name under 200 characters."
@@ -105,14 +105,21 @@ func (s *Service) Resolve(ctx context.Context, f *model.ApplicationFields) (*Inp
 		}
 		if u != nil {
 			in.UniversityID, in.UniLabel, in.Country = &u.ID, u.Name, u.Country
-			f.UniversityID, f.UniversityName, f.UniOther, f.UniOtherCountry = strconv.FormatInt(u.ID, 10), u.Name, "", ""
+			f.UniversityID, f.UniversityName, f.UniOther, f.CountryName = strconv.FormatInt(u.ID, 10), u.Name, "", u.Country
 			break
 		}
-		if f.UniOtherCountry != "" && !contains(model.Countries, f.UniOtherCountry) {
-			errs["uni_other_country"] = "Pick a country from the list."
+		if f.CountryName != "" {
+			c, ok, err := catalog.CanonicalCountry(ctx, s.pool, f.CountryName)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !ok {
+				errs["country"] = "Pick a country from the list."
+			}
+			f.CountryName = c
 		}
-		in.CustomName, in.CustomCountry = &f.UniOther, opt(f.UniOtherCountry)
-		in.UniLabel, in.Country = f.UniOther, f.UniOtherCountry
+		in.CustomName, in.CustomCountry = &f.UniOther, opt(f.CountryName)
+		in.UniLabel, in.Country = f.UniOther, f.CountryName
 	default:
 		errs["university"] = "Pick a university, or choose “Other” and type one."
 	}
@@ -181,7 +188,7 @@ func (s *Service) Resolve(ctx context.Context, f *model.ApplicationFields) (*Inp
 				cur = "EUR"
 			}
 			if !contains(model.Currencies, cur) {
-				errs["tuition_fee"] = "Pick a currency from the list."
+				errs["tuition_currency"] = "Pick a currency from the list."
 			}
 			in.Currency = &cur
 		}
@@ -218,11 +225,12 @@ func YearOptions(current string) []model.Option {
 }
 
 // FormVM builds the application form view model.
-func (s *Service) FormVM(f model.ApplicationFields, errs map[string]string, country string) pages.AppFormVM {
+func (s *Service) FormVM(ctx context.Context, f model.ApplicationFields, errs map[string]string) (pages.AppFormVM, error) {
 	if errs == nil {
 		errs = map[string]string{}
 	}
-	return pages.AppFormVM{F: f, Errs: errs, Country: country, Years: YearOptions(f.Year)}
+	countries, err := catalog.CountryNames(ctx, s.pool)
+	return pages.AppFormVM{F: f, Errs: errs, Countries: countries, Years: YearOptions(f.Year)}, err
 }
 
 func (in *Input) args() []any {

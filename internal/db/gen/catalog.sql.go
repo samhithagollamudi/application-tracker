@@ -25,6 +25,17 @@ func (q *Queries) CreateConsultancy(ctx context.Context, arg CreateConsultancyPa
 	return id, err
 }
 
+const createCountry = `-- name: CreateCountry :one
+INSERT INTO countries (name) VALUES ($1) RETURNING id
+`
+
+func (q *Queries) CreateCountry(ctx context.Context, name string) (int16, error) {
+	row := q.db.QueryRow(ctx, createCountry, name)
+	var id int16
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createUniversity = `-- name: CreateUniversity :one
 INSERT INTO universities (name, country, created_by) VALUES ($1, $2, $3) RETURNING id
 `
@@ -49,6 +60,20 @@ DELETE FROM consultancies c WHERE c.id = $1
 
 func (q *Queries) DeleteUnusedConsultancy(ctx context.Context, id int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteUnusedConsultancy, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteUnusedCountry = `-- name: DeleteUnusedCountry :execrows
+DELETE FROM countries c WHERE c.id = $1
+  AND NOT EXISTS (SELECT 1 FROM universities u WHERE u.country = c.name)
+  AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.custom_university_country = c.name)
+`
+
+func (q *Queries) DeleteUnusedCountry(ctx context.Context, id int16) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUnusedCountry, id)
 	if err != nil {
 		return 0, err
 	}
@@ -98,6 +123,17 @@ func (q *Queries) GetConsultancyByName(ctx context.Context, name string) (GetCon
 	var i GetConsultancyByNameRow
 	err := row.Scan(&i.ID, &i.Name)
 	return i, err
+}
+
+const getCountryName = `-- name: GetCountryName :one
+SELECT name FROM countries WHERE lower(name) = lower($1::text)
+`
+
+func (q *Queries) GetCountryName(ctx context.Context, name string) (string, error) {
+	row := q.db.QueryRow(ctx, getCountryName, name)
+	var name_2 string
+	err := row.Scan(&name_2)
+	return name_2, err
 }
 
 const getUniversity = `-- name: GetUniversity :one
@@ -231,6 +267,69 @@ func (q *Queries) ListCountries(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
+const listCountriesAdmin = `-- name: ListCountriesAdmin :many
+SELECT c.id, c.name,
+       (SELECT count(*) FROM universities u WHERE u.country = c.name)::int AS universities,
+       (SELECT count(*) FROM applications a WHERE a.custom_university_country = c.name)::int AS one_off_applications
+FROM countries c ORDER BY lower(c.name)
+`
+
+type ListCountriesAdminRow struct {
+	ID                 int16
+	Name               string
+	Universities       int32
+	OneOffApplications int32
+}
+
+func (q *Queries) ListCountriesAdmin(ctx context.Context) ([]ListCountriesAdminRow, error) {
+	rows, err := q.db.Query(ctx, listCountriesAdmin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCountriesAdminRow
+	for rows.Next() {
+		var i ListCountriesAdminRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Universities,
+			&i.OneOffApplications,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCountryNames = `-- name: ListCountryNames :many
+SELECT name FROM countries ORDER BY lower(name)
+`
+
+func (q *Queries) ListCountryNames(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listCountryNames)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUniversities = `-- name: ListUniversities :many
 SELECT id, name, country FROM universities ORDER BY lower(name)
 `
@@ -304,14 +403,44 @@ func (q *Queries) ListUniversitiesAdmin(ctx context.Context) ([]ListUniversities
 	return items, nil
 }
 
+const listUsedYears = `-- name: ListUsedYears :many
+SELECT DISTINCT year FROM applications WHERE year IS NOT NULL ORDER BY year
+`
+
+func (q *Queries) ListUsedYears(ctx context.Context) ([]*int16, error) {
+	rows, err := q.db.Query(ctx, listUsedYears)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*int16
+	for rows.Next() {
+		var year *int16
+		if err := rows.Scan(&year); err != nil {
+			return nil, err
+		}
+		items = append(items, year)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchUniversities = `-- name: SearchUniversities :many
 SELECT id, name, country FROM universities
-WHERE $1::text = ''
-   OR name ILIKE '%' || $1::text || '%'
-   OR country ILIKE '%' || $1::text || '%'
+WHERE ($1::text = '' OR country = $1::text)
+  AND ($2::text = ''
+   OR name ILIKE '%' || $2::text || '%'
+   OR country ILIKE '%' || $2::text || '%')
 ORDER BY lower(name)
 LIMIT 30
 `
+
+type SearchUniversitiesParams struct {
+	Country string
+	Q       string
+}
 
 type SearchUniversitiesRow struct {
 	ID      int64
@@ -319,8 +448,8 @@ type SearchUniversitiesRow struct {
 	Country string
 }
 
-func (q *Queries) SearchUniversities(ctx context.Context, q_ string) ([]SearchUniversitiesRow, error) {
-	rows, err := q.db.Query(ctx, searchUniversities, q_)
+func (q *Queries) SearchUniversities(ctx context.Context, arg SearchUniversitiesParams) ([]SearchUniversitiesRow, error) {
+	rows, err := q.db.Query(ctx, searchUniversities, arg.Country, arg.Q)
 	if err != nil {
 		return nil, err
 	}

@@ -45,7 +45,7 @@ func (u *User) RoleLabel() string {
 	case RoleAdmin:
 		return "Admin · All branches"
 	case RoleConsultant:
-		return "Consultant · " + u.BranchName
+		return u.BranchName + " · Consultant"
 	default:
 		return "Agent network · B2B"
 	}
@@ -83,9 +83,6 @@ var Intakes = []Option{{"autumn", "Autumn"}, {"spring", "Spring"}}
 var TuitionPer = []Option{{"semester", "Semester"}, {"year", "Year"}, {"programme", "Programme"}}
 var Genders = []Option{{"Female", "Female"}, {"Male", "Male"}, {"Other", "Other"}}
 var Currencies = []string{"EUR", "SEK", "DKK", "NOK", "GBP", "CHF", "PLN", "CZK", "HUF", "INR"}
-var Countries = []string{"Austria", "Belgium", "Czechia", "Denmark", "Estonia", "Finland", "France", "Germany", "Hungary",
-	"Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands", "Norway", "Poland", "Portugal",
-	"Spain", "Sweden", "Switzerland", "UK"}
 
 // ProgressSteps is the happy path shown as dots on each application.
 var ProgressSteps = []Option{{"applied", "Applied"}, {"admitted", "Admitted"}, {"fees_paid", "Fees paid"}, {"visa_granted", "Visa granted"}}

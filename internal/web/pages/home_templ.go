@@ -112,7 +112,7 @@ func Login(email, errMsg string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"login\"><section class=\"left\"><div class=\"small b\" style=\"letter-spacing:.14em;text-transform:uppercase;color:#F1DDF2\">SNY Cosmos Overseas</div><h1 style=\"font-size:40px;line-height:1.1\">Application Tracker</h1><p>Track every student and university application across all branches and the agent network. Sign in with the user ID and password your admin gave you.</p></section><section class=\"right\"><div class=\"box\"><form class=\"card\" method=\"post\" action=\"/login\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"login\"><section class=\"left\"><div class=\"small b\" style=\"letter-spacing:.14em;text-transform:uppercase;color:#F1DDF2\">SNY Cosmos Overseas</div><h1 style=\"font-size:40px;line-height:1.1\">Application Tracker</h1><p>Track every student and their application progress across all branches and the agent network</p></section><section class=\"right\"><div class=\"box\"><form class=\"card\" method=\"post\" action=\"/login\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -189,7 +189,7 @@ func Login(email, errMsg string) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<button class=\"btn pri\" type=\"submit\">Sign in</button><p class=\"small muted\" style=\"margin:0\">Forgot your password? Ask your admin to reset it.</p></form></div></section></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<button class=\"btn pri\" type=\"submit\">Sign in</button></form></div></section></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -239,7 +239,7 @@ func Placeholder(title, active string) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/home.templ`, Line: 54, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/home.templ`, Line: 53, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {

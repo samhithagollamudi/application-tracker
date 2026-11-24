@@ -50,12 +50,22 @@ func (h *AdminHandlers) vm(r *http.Request, tab string) (pages.CatalogVM, error)
 		vm.Consultancies = append(vm.Consultancies, pages.CatalogRow{ID: c.ID, Name: c.Name,
 			AddedBy: addedBy(c.AddedByName, c.AddedByRole), Uses: int(c.Uses)})
 	}
+	ks, err := h.Svc.q.ListCountriesAdmin(ctx)
+	if err != nil {
+		return vm, err
+	}
+	for _, k := range ks {
+		vm.Countries = append(vm.Countries, pages.CatalogRow{ID: int64(k.ID), Name: k.Name, Uses: int(k.Universities), OneOff: int(k.OneOffApplications)})
+		vm.CountryNames = append(vm.CountryNames, k.Name)
+	}
 	return vm, nil
 }
 
 func tabOf(r *http.Request) string {
-	if r.URL.Query().Get("tab") == "consultancies" || r.PathValue("kind") == "consultancies" {
-		return "consultancies"
+	for _, t := range []string{r.PathValue("kind"), r.URL.Query().Get("tab")} {
+		if t == "consultancies" || t == "countries" {
+			return t
+		}
 	}
 	return "universities"
 }
@@ -77,7 +87,7 @@ func isUnique(err error) bool {
 func (h *AdminHandlers) Add(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	tab := tabOf(r)
-	if k := r.PathValue("kind"); k != "universities" && k != "consultancies" {
+	if k := r.PathValue("kind"); k != "universities" && k != "consultancies" && k != "countries" {
 		web.NotFound(w, r)
 		return
 	}
@@ -91,14 +101,25 @@ func (h *AdminHandlers) Add(w http.ResponseWriter, r *http.Request) {
 		msg = "Enter a name."
 	case utf8.RuneCountInString(name) > 200:
 		msg = "Keep the name under 200 characters."
-	case tab == "universities" && !validCountry(country):
-		msg = "Pick a country from the list."
+	case tab == "universities":
+		c, ok, err := CanonicalCountry(ctx, h.Svc.pool, country)
+		if err != nil {
+			web.ServerError(w, r, err)
+			return
+		}
+		if !ok {
+			msg = "Pick a country from the list."
+		}
+		country = c
 	}
 	var err error
 	if msg == "" {
-		if tab == "universities" {
+		switch tab {
+		case "universities":
 			_, err = h.Svc.q.CreateUniversity(ctx, gen.CreateUniversityParams{Name: name, Country: country, CreatedBy: &actor})
-		} else {
+		case "countries":
+			_, err = h.Svc.q.CreateCountry(ctx, name)
+		default:
 			_, err = h.Svc.q.CreateConsultancy(ctx, gen.CreateConsultancyParams{Name: name, CreatedBy: &actor})
 		}
 		if isUnique(err) {
@@ -135,6 +156,8 @@ func (h *AdminHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 	switch tabOf(r) {
 	case "universities":
 		n, err = h.Svc.q.DeleteUnusedUniversity(ctx, id)
+	case "countries":
+		n, err = h.Svc.q.DeleteUnusedCountry(ctx, int16(id))
 	default:
 		n, err = h.Svc.q.DeleteUnusedConsultancy(ctx, id)
 	}
@@ -148,13 +171,4 @@ func (h *AdminHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 		h.Auth.Flash(ctx, "Removed")
 	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog?tab=%s", tabOf(r)), http.StatusSeeOther)
-}
-
-func validCountry(c string) bool {
-	for _, x := range model.Countries {
-		if x == c {
-			return true
-		}
-	}
-	return false
 }

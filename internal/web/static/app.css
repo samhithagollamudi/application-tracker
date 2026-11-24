@@ -7,7 +7,6 @@ html{color-scheme:light;scrollbar-color:#C9B6CA #F6F5F9}
 ::-webkit-scrollbar-thumb{background:#C9B6CA;border-radius:999px;border:2px solid #fff}::-webkit-scrollbar-thumb:hover{background:#A783A9}
 input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,select:-webkit-autofill,textarea:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px #fff inset!important;box-shadow:0 0 0 1000px #fff inset!important;-webkit-text-fill-color:#1F1A24!important;caret-color:#1F1A24;transition:background-color 9999s ease-out 0s}
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield;appearance:textfield}
-.money{display:flex;gap:8px}.money select{width:96px;flex:none}
 body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--tx);background:var(--bg);font-size:14px}
 a{color:var(--b)}
 button{font:inherit;cursor:pointer;color:inherit}

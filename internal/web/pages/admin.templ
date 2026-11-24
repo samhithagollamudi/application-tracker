@@ -38,7 +38,8 @@ templ Applications(vm ApplicationsVM) {
 			@components.MultiSelect("Country", "country", "Any country", vm.Countries, vm.F.Country)
 			@components.MultiSelect("University", "university", "Any university", vm.Universities, vm.F.University)
 			@components.MultiSelect("Status", "status", "Any status", model.Statuses, vm.F.Status)
-			@components.MultiSelect("Intake", "intake", "Any intake", vm.Intakes, vm.F.Intake)
+			@components.MultiSelect("Intake", "intake", "Any intake", model.Intakes, vm.F.Intake)
+			@components.MultiSelect("Year", "year", "Any year", vm.Years, vm.F.Year)
 			@components.MultiSelect("Programme level", "level", "Any level", model.Levels, vm.F.Level)
 			@components.MultiSelect("Source", "source", "Internal + B2B", sourceOptions, vm.F.Source)
 			@components.MultiSelect("Consultancy", "consultancy", "Any consultancy", append([]model.Option{{Value: "none", Label: "Internal only (no consultancy)"}}, vm.Consultancies...), vm.F.Consultancy)
@@ -157,12 +158,13 @@ templ Catalog(vm CatalogVM) {
 		<div class="head">
 			<div>
 				<h1>Universities &amp; consultancies</h1>
-				<p class="sub">These are the lists consultants and the agent network see in their dropdowns. Only admins add universities; a university typed under “Other” stays on that one application. Consultancies the agent network types under “Other” are added here and marked.</p>
+				<p class="sub">These are the lists consultants and the agent network see in their dropdowns. Only admins add universities and countries; a university typed under “Other” stays on that one application. Consultancies the agent network types under “Other” are added here and marked.</p>
 			</div>
 		</div>
 		<div class="tabs" role="tablist">
 			<a role="tab" class={ "tab", templ.KV("on", vm.Tab == "universities") } aria-selected={ strconv.FormatBool(vm.Tab == "universities") } href="/admin/catalog">Universities ({ strconv.Itoa(len(vm.Universities)) })</a>
 			<a role="tab" class={ "tab", templ.KV("on", vm.Tab == "consultancies") } aria-selected={ strconv.FormatBool(vm.Tab == "consultancies") } href="/admin/catalog?tab=consultancies">External consultancies ({ strconv.Itoa(len(vm.Consultancies)) })</a>
+			<a role="tab" class={ "tab", templ.KV("on", vm.Tab == "countries") } aria-selected={ strconv.FormatBool(vm.Tab == "countries") } href="/admin/catalog?tab=countries">Countries ({ strconv.Itoa(len(vm.Countries)) })</a>
 		</div>
 		<div class="row" style="align-items:flex-start;gap:20px">
 			<div class="tbl" style="flex:999 1 520px;min-width:0">
@@ -172,6 +174,8 @@ templ Catalog(vm CatalogVM) {
 							<tr>
 								if vm.Tab == "universities" {
 									<th>University</th><th>Country</th><th>Applications</th><th></th>
+								} else if vm.Tab == "countries" {
+									<th>Country</th><th>Universities</th><th>One-off applications</th><th></th>
 								} else {
 									<th>Consultancy</th><th>Added by</th><th>Students</th><th></th>
 								}
@@ -186,6 +190,17 @@ templ Catalog(vm CatalogVM) {
 										<td>{ strconv.Itoa(r.Uses) }</td>
 										<td>
 											@catalogDelete(r, "universities")
+										</td>
+									</tr>
+								}
+							} else if vm.Tab == "countries" {
+								for _, r := range vm.Countries {
+									<tr>
+										<td class="b">{ r.Name }</td>
+										<td>{ strconv.Itoa(r.Uses) }</td>
+										<td>{ strconv.Itoa(r.OneOff) }</td>
+										<td>
+											@catalogDelete(CatalogRow{ID: r.ID, Name: r.Name, Uses: r.Uses + r.OneOff}, "countries")
 										</td>
 									</tr>
 								}
@@ -213,12 +228,17 @@ templ Catalog(vm CatalogVM) {
 					<label class="f">
 						Country
 						<select name="country">
-							for _, c := range model.Countries {
-								<option value={ c } selected?={ c == orDefault(vm.Country, "Sweden") }>{ c }</option>
+							<option value="">Select country</option>
+							for _, c := range vm.CountryNames {
+								<option value={ c } selected?={ c == vm.Country }>{ c }</option>
 							}
 						</select>
 					</label>
 					<button class="btn pri" type="submit">Add university</button>
+				} else if vm.Tab == "countries" {
+					<h2>Add country</h2>
+					@components.Field("Country name", "name", vm.Name, "text", "", "", vm.Err)
+					<button class="btn pri" type="submit">Add country</button>
 				} else {
 					<h2>Add consultancy</h2>
 					@components.Field("Consultancy name", "name", vm.Name, "text", "", "", vm.Err)

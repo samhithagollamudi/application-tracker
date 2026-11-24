@@ -11,8 +11,8 @@ import (
 
 // Filter forms hold the raw selected values (several per filter).
 type StudentFilterForm struct {
-	Q                                                string
-	Branch, Consultancy, Country, University, Status []string
+	Q                                                                     string
+	Branch, Consultancy, Country, University, Status, Level, Intake, Year []string
 }
 
 type StudentsVM struct {
@@ -28,6 +28,7 @@ type StudentsVM struct {
 	Consultancies   []model.Option
 	Countries       []model.Option
 	Universities    []model.Option
+	Years           []model.Option
 }
 
 func (vm StudentsVM) Cols() int {
@@ -46,7 +47,6 @@ func (vm StudentsVM) Cols() int {
 type StudentDetailVM struct {
 	S        *model.Student
 	Apps     []model.Application
-	Activity []model.Activity
 	CanMove  bool
 	Branches []model.Option
 	From     string // "students" or "applications" (breadcrumb)
@@ -78,7 +78,7 @@ type AppFormVM struct {
 	Submit     string
 	F          model.ApplicationFields
 	Errs       map[string]string
-	Country    string // country of the picked list university (read-only box)
+	Countries  []string // the admin-maintained Country dropdown
 	Years      []model.Option
 	Student    string // "Name · STU-12" subtitle on the standalone form
 }
@@ -97,8 +97,8 @@ func plural(n int, one, many string) string {
 // ---- admin: applications ----
 
 type AppFilterForm struct {
-	Q, From, To                                                             string
-	Branch, Country, University, Status, Intake, Level, Source, Consultancy []string
+	Q, From, To                                                                   string
+	Branch, Country, University, Status, Intake, Year, Level, Source, Consultancy []string
 }
 
 // Active counts the filters in use (a multi-select counts once).
@@ -109,7 +109,7 @@ func (f AppFilterForm) Active() int {
 			n++
 		}
 	}
-	for _, v := range [][]string{f.Branch, f.Country, f.University, f.Status, f.Intake, f.Level, f.Source, f.Consultancy} {
+	for _, v := range [][]string{f.Branch, f.Country, f.University, f.Status, f.Intake, f.Year, f.Level, f.Source, f.Consultancy} {
 		if len(v) > 0 {
 			n++
 		}
@@ -126,7 +126,7 @@ type ApplicationsVM struct {
 	Branches      []model.Option
 	Countries     []model.Option
 	Universities  []model.Option
-	Intakes       []model.Option
+	Years         []model.Option
 	Consultancies []model.Option
 	Page          model.Page
 	Query         string // current filters as a query string, without "page"
@@ -138,6 +138,7 @@ func studentFromApps(id int64) string { return fmt.Sprintf("/students/%d?from=ap
 // ---- admin: catalog ----
 
 type CatalogRow struct {
+	OneOff  int
 	ID      int64
 	Name    string
 	Country string
@@ -146,9 +147,11 @@ type CatalogRow struct {
 }
 
 type CatalogVM struct {
-	Tab           string // "universities" | "consultancies"
+	Tab           string // "universities" | "consultancies" | "countries"
 	Universities  []CatalogRow
 	Consultancies []CatalogRow
+	Countries     []CatalogRow // Uses = universities in that country, OneOff = one-off applications
+	CountryNames  []string     // for the add-university dropdown
 	Err           string
 	Name          string
 	Country       string

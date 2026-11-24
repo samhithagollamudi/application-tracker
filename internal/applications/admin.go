@@ -3,7 +3,6 @@ package applications
 import (
 	"context"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +20,8 @@ type Filter struct {
 	Countries      []string
 	UniversityIDs  []int64
 	Statuses       []string
-	Intakes        []string // "autumn-2027"
+	Intakes        []string // autumn | spring
+	Years          []int16
 	Levels         []string
 	Sources        []string // internal | b2b
 	ConsultancyIDs []int64
@@ -31,17 +31,6 @@ type Filter struct {
 
 var sources = []model.Option{{Value: "internal"}, {Value: "b2b"}}
 
-func validIntakes(vals []string) []string {
-	var out []string
-	for _, v := range model.NonEmpty(vals) {
-		in, y, ok := strings.Cut(v, "-")
-		if _, err := strconv.ParseInt(y, 10, 16); ok && err == nil && model.ValidOption(model.Intakes, in) {
-			out = append(out, v)
-		}
-	}
-	return out
-}
-
 // ParseFilter reads a Filter from query values, ignoring invalid entries.
 func ParseFilter(q url.Values) Filter {
 	f := Filter{
@@ -50,7 +39,8 @@ func ParseFilter(q url.Values) Filter {
 		Countries:     model.NonEmpty(q["country"]),
 		UniversityIDs: model.Int64s(q["university"]),
 		Statuses:      model.ValidValues(model.Statuses, q["status"]),
-		Intakes:       validIntakes(q["intake"]),
+		Intakes:       model.ValidValues(model.Intakes, q["intake"]),
+		Years:         model.Int16s(q["year"]),
 		Levels:        model.ValidValues(model.Levels, q["level"]),
 		Sources:       model.ValidValues(sources, q["source"]),
 	}
@@ -118,7 +108,10 @@ func where(scope access.Scope, f Filter, args *access.Args) string {
 		w = append(w, `a.status = ANY(`+args.Add(f.Statuses)+`)`)
 	}
 	if len(f.Intakes) > 0 {
-		w = append(w, `(a.intake || '-' || a.year::text) = ANY(`+args.Add(f.Intakes)+`)`)
+		w = append(w, `a.intake = ANY(`+args.Add(f.Intakes)+`)`)
+	}
+	if len(f.Years) > 0 {
+		w = append(w, `a.year = ANY(`+args.Add(f.Years)+`)`)
 	}
 	if len(f.Levels) > 0 {
 		w = append(w, `a.programme_level = ANY(`+args.Add(f.Levels)+`)`)
@@ -187,27 +180,6 @@ func (s *Service) Search(ctx context.Context, scope access.Scope, f Filter, page
 		out = append(out, r)
 	}
 	return out, st, page, rows.Err()
-}
-
-// IntakeOptions lists the intake/year combinations in use, e.g. "Autumn 2027".
-func (s *Service) IntakeOptions(ctx context.Context) ([]model.Option, error) {
-	rows, err := s.pool.Query(ctx, `SELECT DISTINCT intake, year FROM applications
-		WHERE intake IS NOT NULL AND year IS NOT NULL ORDER BY year, intake DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []model.Option
-	for rows.Next() {
-		var in string
-		var y int16
-		if err := rows.Scan(&in, &y); err != nil {
-			return nil, err
-		}
-		ys := strconv.Itoa(int(y))
-		out = append(out, model.Option{Value: in + "-" + ys, Label: model.IntakeLabel(in) + " " + ys})
-	}
-	return out, rows.Err()
 }
 
 // Count returns how many applications match f (used to decide whether an

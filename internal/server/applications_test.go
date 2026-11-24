@@ -21,10 +21,15 @@ func (w *world) count(t *testing.T, sql string, args ...any) int {
 func TestStudentCreatedWithFirstApplication(t *testing.T) {
 	w := newWorld(t)
 	r := w.chennai.Get(fmt.Sprintf("/students/%d", w.sChennai))
-	for _, want := range []string{"Priya Rao", "Lund University", "Applied", "Chennai branch", "Student created", "Application added: Lund University (Applied)"} {
+	for _, want := range []string{"Priya Rao", "Lund University", "Applied"} {
 		if !strings.Contains(r.Body, want) {
 			t.Errorf("detail page missing %q", want)
 		}
+	}
+	// The activity log is still recorded (just not shown on the page).
+	if n := w.count(t, `SELECT count(*) FROM activity_log WHERE student_id = $1 AND detail->>'text' IN
+		('Student created', 'Application added: Lund University (Applied)')`, w.sChennai); n != 2 {
+		t.Errorf("activity entries = %d, want 2", n)
 	}
 	// Internal student belongs to the creator's branch; B2B student has the consultancy and no branch.
 	if n := w.count(t, `SELECT count(*) FROM students s JOIN branches b ON b.id = s.branch_id
@@ -57,7 +62,7 @@ func TestOneOffUniversityIsNotAddedToList(t *testing.T) {
 	w := newWorld(t)
 	before := w.count(t, `SELECT count(*) FROM universities`)
 	r := w.chennai.Post(fmt.Sprintf("/students/%d/applications/new", w.sChennai), url.Values{
-		"uni_other": {"Tiny Polytechnic"}, "uni_other_country": {"Estonia"}, "programme_level": {"masters"},
+		"uni_other": {"Tiny Polytechnic"}, "country": {"Estonia"}, "programme_level": {"masters"},
 		"tuition_fee": {"9,500.50"}, "tuition_currency": {"EUR"}, "tuition_per": {"year"},
 	})
 	if r.Status != http.StatusSeeOther {
@@ -71,7 +76,7 @@ func TestOneOffUniversityIsNotAddedToList(t *testing.T) {
 		t.Fatal("one-off application not stored as expected")
 	}
 	page := w.chennai.Get(fmt.Sprintf("/students/%d", w.sChennai))
-	if !strings.Contains(page.Body, "One-off") || !strings.Contains(page.Body, "EUR 9500.50 per year") {
+	if !strings.Contains(page.Body, "One-off") || !strings.Contains(page.Body, "Tuition fee: 9,500.50 EUR per year") {
 		t.Error("detail page doesn't show the one-off application")
 	}
 
@@ -141,8 +146,12 @@ func TestAdminMovesStudent(t *testing.T) {
 		t.Fatalf("move: %d", r.Status)
 	}
 	// Now Hyderabad sees it (owner = Hyderabad consultant) and Chennai does not.
-	if r := w.hyd.Get(fmt.Sprintf("/students/%d", w.sChennai)); r.Status != http.StatusOK || !strings.Contains(r.Body, "Owner: Hyderabad consultant") {
+	if r := w.hyd.Get(fmt.Sprintf("/students/%d", w.sChennai)); r.Status != http.StatusOK {
 		t.Fatalf("hyderabad after move: %d", r.Status)
+	}
+	if n := w.count(t, `SELECT count(*) FROM students s JOIN users u ON u.id = s.owner_id
+		WHERE s.id = $1 AND u.name = 'Hyderabad consultant'`, w.sChennai); n != 1 {
+		t.Fatal("owner didn't become the Hyderabad consultant")
 	}
 	if r := w.chennai.Get(fmt.Sprintf("/students/%d", w.sChennai)); r.Status != http.StatusNotFound {
 		t.Fatalf("chennai after move: %d", r.Status)

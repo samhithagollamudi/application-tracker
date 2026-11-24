@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ChandraShekar2001/application-tracker/internal/access"
-	"github.com/ChandraShekar2001/application-tracker/internal/activity"
 	"github.com/ChandraShekar2001/application-tracker/internal/applications"
 	"github.com/ChandraShekar2001/application-tracker/internal/auth"
 	"github.com/ChandraShekar2001/application-tracker/internal/catalog"
@@ -46,10 +45,14 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		Countries:      model.NonEmpty(q["country"]),
 		UniversityIDs:  model.Int64s(q["university"]),
 		Statuses:       model.ValidValues(model.Statuses, q["status"]),
+		Levels:         model.ValidValues(model.Levels, q["level"]),
+		Intakes:        model.ValidValues(model.Intakes, q["intake"]),
+		Years:          model.Int16s(q["year"]),
 	}
 	ff := pages.StudentFilterForm{
 		Q: q.Get("q"), Branch: q["branch"], Consultancy: q["consultancy"],
 		Country: q["country"], University: q["university"], Status: q["status"],
+		Level: q["level"], Intake: q["intake"], Year: q["year"],
 	}
 
 	rows, page, err := h.Svc.List(r.Context(), scope, f, model.ParsePage(q.Get("page")))
@@ -89,6 +92,10 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		web.ServerError(w, r, err)
 		return
 	}
+	if vm.Years, err = h.Cat.YearOptions(ctx); err != nil {
+		web.ServerError(w, r, err)
+		return
+	}
 	web.OK(w, r, pages.Students(vm))
 }
 
@@ -110,10 +117,6 @@ func (h *Handlers) Detail(w http.ResponseWriter, r *http.Request) {
 	}
 	vm := pages.StudentDetailVM{S: s, CanMove: u.IsAdmin(), From: r.URL.Query().Get("from")}
 	if vm.Apps, err = applications.ListForStudent(r.Context(), h.Pool, id); err != nil {
-		web.ServerError(w, r, err)
-		return
-	}
-	if vm.Activity, err = activity.List(r.Context(), h.Pool, id); err != nil {
 		web.ServerError(w, r, err)
 		return
 	}
@@ -150,7 +153,11 @@ func parseConsultancy(r *http.Request) (ConsultancyChoice, string, string) {
 func (h *Handlers) newFormVM(r *http.Request, u *model.User) (pages.StudentFormVM, error) {
 	vm := pages.StudentFormVM{
 		Title: "New student & application", Action: "/students/new", CancelHref: "/students", Submit: "Save student",
-		ShowApp: true, App: h.Apps.FormVM(model.ApplicationFields{}, nil, ""),
+		ShowApp: true,
+	}
+	var err error
+	if vm.App, err = h.Apps.FormVM(r.Context(), model.ApplicationFields{}, nil); err != nil {
+		return vm, err
 	}
 	if u.Role == model.RoleAgentNetwork {
 		vm.Sub = "Only the application email is required. The student is saved as a B2B student, so branch consultants can’t see them."
@@ -200,11 +207,10 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		appIn = in
 	}
-	country := ""
-	if appIn != nil {
-		country = appIn.Country
+	if vm.App, err = h.Apps.FormVM(ctx, appF, errs); err != nil {
+		web.ServerError(w, r, err)
+		return
 	}
-	vm.App = h.Apps.FormVM(appF, errs, country)
 
 	var id int64
 	if len(errs) == 0 {

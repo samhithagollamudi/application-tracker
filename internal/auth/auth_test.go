@@ -63,7 +63,7 @@ func TestLoginFlow(t *testing.T) {
 	if r := cons.Get("/"); r.Location != "/students" {
 		t.Fatalf("consultant home redirect = %q", r.Location)
 	}
-	if r := cons.Get("/students"); !strings.Contains(r.Body, "Consultant · Chennai") {
+	if r := cons.Get("/students"); !strings.Contains(r.Body, "Chennai · Consultant") {
 		t.Fatal("role pill missing from shell")
 	}
 

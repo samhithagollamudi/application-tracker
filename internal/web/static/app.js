@@ -42,15 +42,16 @@ document.addEventListener('submit', (e) => {
       q: c.querySelector('.combo-q'), id: c.querySelector('[name=university_id]'),
       name: c.querySelector('[name=university_name]'), list: c.querySelector('.combo-list'),
       other: c.querySelector('.combo-other'), otherName: c.querySelector('[name=uni_other]'),
-      country: form.querySelector('#uniCountry'), countrySel: form.querySelector('#uniCountrySel'),
+      country: form.querySelector('[data-app-country]'),
     };
   };
   const close = (p) => { p.list.hidden = true; p.q.setAttribute('aria-expanded', 'false'); };
+  const clearPick = (p) => { p.id.value = ''; p.name.value = ''; p.id.dataset.country = ''; };
   function setOther(c, on) {
     const p = parts(c);
-    p.q.hidden = on; p.other.hidden = !on; p.country.hidden = on; p.countrySel.hidden = !on; close(p);
-    if (on) { p.id.value = ''; p.name.value = ''; p.otherName.value = p.q.value; p.otherName.focus(); }
-    else { p.otherName.value = ''; p.countrySel.value = ''; p.q.focus(); }
+    p.q.hidden = on; p.other.hidden = !on; close(p);
+    if (on) { clearPick(p); p.otherName.value = p.q.value; p.otherName.focus(); }
+    else { p.otherName.value = ''; p.q.focus(); }
   }
   document.addEventListener('htmx:afterSwap', (e) => {
     if (e.target.classList.contains('combo-list')) {
@@ -63,8 +64,10 @@ document.addEventListener('submit', (e) => {
     if (pick) {
       const c = pick.closest('[data-combo]'), p = parts(c);
       if (pick.dataset.pick === '__other') { setOther(c, true); return; }
-      p.id.value = pick.dataset.pick; p.name.value = pick.dataset.name;
-      p.q.value = pick.dataset.name; p.country.value = pick.dataset.country; close(p);
+      p.id.value = pick.dataset.pick; p.name.value = pick.dataset.name; p.id.dataset.country = pick.dataset.country;
+      p.q.value = pick.dataset.name; close(p);
+      // A list university belongs to one country: show it in the Country dropdown.
+      if (p.country && pick.dataset.country) p.country.value = pick.dataset.country;
       return;
     }
     const back = e.target.closest('[data-combo-back]');
@@ -73,12 +76,21 @@ document.addEventListener('submit', (e) => {
   });
   document.addEventListener('input', (e) => {
     if (e.target.classList.contains('combo-q')) {
-      const p = parts(e.target.closest('[data-combo]'));
-      p.id.value = ''; p.name.value = ''; p.country.value = '';
+      clearPick(parts(e.target.closest('[data-combo]')));
     }
     if ('digits' in e.target.dataset) {
       const v = e.target.value.replace(/\D/g, '');
       if (v !== e.target.value) e.target.value = v;
+    }
+  });
+  // Changing the country drops a picked list university from another country.
+  document.addEventListener('change', (e) => {
+    if (!e.target.matches('[data-app-country]')) return;
+    const c = e.target.closest('form').querySelector('[data-combo]');
+    if (!c) return;
+    const p = parts(c);
+    if (p.id.value && p.id.dataset.country && p.id.dataset.country !== e.target.value) {
+      clearPick(p); p.q.value = '';
     }
   });
   document.addEventListener('keydown', (e) => {

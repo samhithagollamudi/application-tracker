@@ -43,7 +43,10 @@ templ Students(vm StudentsVM) {
 			}
 			@components.MultiSelect("Country", "country", "Any country", vm.Countries, vm.F.Country)
 			@components.MultiSelect("University", "university", "Any university", vm.Universities, vm.F.University)
-			@components.MultiSelect("Status (any application)", "status", "Any status", model.Statuses, vm.F.Status)
+			@components.MultiSelect("Programme level", "level", "Any level", model.Levels, vm.F.Level)
+			@components.MultiSelect("Intake", "intake", "Any intake", model.Intakes, vm.F.Intake)
+			@components.MultiSelect("Year", "year", "Any year", vm.Years, vm.F.Year)
+			@components.MultiSelect("Status", "status", "Any status", model.Statuses, vm.F.Status)
 			<noscript><button class="btn" type="submit">Apply filters</button></noscript>
 		</form>
 		@studentResults(vm)
@@ -117,16 +120,6 @@ func detailActive(from string) string {
 	return "students"
 }
 
-func sourceLine(s *model.Student) string {
-	if s.Source == "b2b" {
-		c := s.ConsultancyName
-		if c == "" {
-			c = "—"
-		}
-		return "B2B · Consultancy: " + c
-	}
-	return s.BranchName + " branch"
-}
 
 templ StudentDetail(vm StudentDetailVM) {
 	@layout.Page(vm.S.Name(), detailActive(vm.From)) {
@@ -142,7 +135,6 @@ templ StudentDetail(vm StudentDetailVM) {
 			<div style="display:flex;flex-direction:column;gap:4px">
 				<h1 style="font-size:24px">{ vm.S.Name() }</h1>
 				<div class="muted">{ vm.S.Code() } · { vm.S.Email }</div>
-				<div class="small muted">{ sourceLine(vm.S) } · Owner: { vm.S.OwnerName } · Created { model.FormatDate(vm.S.CreatedAt) }</div>
 			</div>
 			<div class="row">
 				<a class="btn" href={ templ.SafeURL(fmt.Sprintf("/students/%d/edit", vm.S.ID)) }>Edit details</a>
@@ -204,14 +196,6 @@ templ StudentDetail(vm StudentDetailVM) {
 						@components.KV("Subjects", vm.S.XIISubjects)
 						@components.KV("CGPA / %", vm.S.XIIGrade)
 					</dl>
-				</section>
-				<section class="card">
-					<h2>Activity</h2>
-					<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:13px">
-						for _, x := range vm.Activity {
-							<li><strong>{ x.Text }</strong><div class="muted">{ x.ActorName } · { model.FormatDate(x.At) }</div></li>
-						}
-					</ul>
 				</section>
 			</aside>
 		</div>

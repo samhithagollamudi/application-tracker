@@ -96,7 +96,12 @@ type ListFilter struct {
 	ConsultancyIDs []int64
 	Countries      []string
 	UniversityIDs  []int64
-	Statuses       []string // a student matches if ANY of their applications has one of these
+	// Application filters: a student matches when ONE of their applications
+	// satisfies all of these together (each list matches any of its values).
+	Statuses []string
+	Levels   []string
+	Intakes  []string
+	Years    []int16
 }
 
 // List returns one page of matching students (most recently updated first)
@@ -119,15 +124,28 @@ func (sv *Service) List(ctx context.Context, scope access.Scope, f ListFilter, p
 	if len(f.ConsultancyIDs) > 0 {
 		where = append(where, `s.consultancy_id = ANY(`+args.Add(f.ConsultancyIDs)+`)`)
 	}
+	var app []string
 	if len(f.Countries) > 0 {
-		where = append(where, `EXISTS (SELECT 1 FROM applications a LEFT JOIN universities un ON un.id = a.university_id
-			WHERE a.student_id = s.id AND coalesce(un.country, a.custom_university_country) = ANY(`+args.Add(f.Countries)+`))`)
+		app = append(app, `coalesce(un.country, a.custom_university_country) = ANY(`+args.Add(f.Countries)+`)`)
 	}
 	if len(f.UniversityIDs) > 0 {
-		where = append(where, `EXISTS (SELECT 1 FROM applications a WHERE a.student_id = s.id AND a.university_id = ANY(`+args.Add(f.UniversityIDs)+`))`)
+		app = append(app, `a.university_id = ANY(`+args.Add(f.UniversityIDs)+`)`)
 	}
 	if len(f.Statuses) > 0 {
-		where = append(where, `EXISTS (SELECT 1 FROM applications a WHERE a.student_id = s.id AND a.status = ANY(`+args.Add(f.Statuses)+`))`)
+		app = append(app, `a.status = ANY(`+args.Add(f.Statuses)+`)`)
+	}
+	if len(f.Levels) > 0 {
+		app = append(app, `a.programme_level = ANY(`+args.Add(f.Levels)+`)`)
+	}
+	if len(f.Intakes) > 0 {
+		app = append(app, `a.intake = ANY(`+args.Add(f.Intakes)+`)`)
+	}
+	if len(f.Years) > 0 {
+		app = append(app, `a.year = ANY(`+args.Add(f.Years)+`)`)
+	}
+	if len(app) > 0 {
+		where = append(where, `EXISTS (SELECT 1 FROM applications a LEFT JOIN universities un ON un.id = a.university_id
+			WHERE a.student_id = s.id AND `+strings.Join(app, " AND ")+`)`)
 	}
 
 	cond := strings.Join(where, " AND ")
